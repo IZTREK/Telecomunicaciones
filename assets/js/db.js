@@ -60,8 +60,8 @@ const PERRONI_DB = {
 
   // Qué puede hacer cada rol dentro del portal (control de acceso basado en roles).
   permisos: {
-    administrador: ["ver_dashboard", "gestionar_usuarios", "ver_bitacora", "editar_roles"],
-    soporte: ["ver_dashboard", "ver_bitacora"],
+    administrador: ["ver_dashboard", "gestionar_usuarios", "ver_bitacora", "editar_roles", "ver_grc"],
+    soporte: ["ver_dashboard", "ver_bitacora", "ver_grc"],
     cliente: ["ver_dashboard"],
   },
 
