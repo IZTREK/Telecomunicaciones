@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión de usuarios y roles — PerroniPhone</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230a0e1c%27/%3E%3Crect x=%276%27 y=%2718%27 width=%274%27 height=%278%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3Crect x=%2713%27 y=%2712%27 width=%274%27 height=%2714%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3Crect x=%2720%27 y=%276%27 width=%274%27 height=%2720%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="app-sidebar">
+    <a href="index.html" class="brand"><span class="bars"><i></i><i></i><i></i><i></i></span> PerroniPhone</a>
+    <nav class="app-nav">
+      <a href="dashboard.html"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="10" width="3.4" height="7.5" rx="1"/><rect x="8.3" y="5.5" width="3.4" height="12" rx="1"/><rect x="14.1" y="2.5" width="3.4" height="15" rx="1"/></svg> Panel</a>
+      <a href="admin.html" class="active"><svg class="nav-ic" viewBox="0 0 20 20"><circle cx="7" cy="6.5" r="3"/><path d="M1.5 17c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5" fill="none" stroke-width="1.6"/><circle cx="15" cy="7.5" r="2.4" fill="none" stroke-width="1.6"/><path d="M12.7 17c.2-2.6 1.9-4.4 4.3-4.4" fill="none" stroke-width="1.6"/></svg> Usuarios y roles</a>
+      <a href="index.html"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M2.5 9.5 10 3l7.5 6.5" fill="none" stroke-width="1.6"/><path d="M4.5 8.5V17h11V8.5" fill="none" stroke-width="1.6"/></svg> Portal público</a>
+    </nav>
+    <div class="session-card" id="session-card"></div>
+    <button class="btn btn-ghost btn-block" id="btn-logout" style="margin-top:14px;">Cerrar sesión</button>
+  </aside>
+
+  <main class="app-main">
+    <div class="app-header">
+      <div>
+        <h1>Usuarios y roles</h1>
+        <p>Alta, cambio de rol y bloqueo de cuentas. Solo visible para administradores.</p>
+      </div>
+      <span class="badge activo">RBAC activo</span>
+    </div>
+
+    <div class="panel">
+      <h2>Directorio de usuarios</h2>
+      <p class="panel-sub">Los cambios se aplican en memoria durante esta sesión del navegador (demo sin backend).</p>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-usuarios"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Matriz de permisos por rol</h2>
+      <p class="panel-sub">Referencia de lo que cada rol puede hacer dentro del portal.</p>
+      <table>
+        <thead><tr><th>Rol</th><th>Permisos asignados</th></tr></thead>
+        <tbody id="tabla-permisos"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/db.js"></script>
+<script src="assets/js/auth.js"></script>
+<script>
+  const sesion = PERRONI_AUTH.requerirSesion(["administrador"]);
+  if (sesion) {
+    const esc = PERRONI_AUTH.escapeHTML;
+
+    document.getElementById("session-card").innerHTML = `
+      <div class="who">${esc(sesion.nombre)}</div>
+      <span class="role-pill ${esc(sesion.rol)}">${esc(sesion.rol)}</span>`;
+
+    document.getElementById("btn-logout").addEventListener("click", () => {
+      PERRONI_AUTH.cerrarSesion();
+      window.location.href = "login.html";
+    });
+
+    function pintarUsuarios() {
+      const tbody = document.getElementById("tabla-usuarios");
+      tbody.innerHTML = PERRONI_DB.usuarios.map((u, i) => `
+        <tr>
+          <td class="cell-id">${esc(u.id)}</td>
+          <td>${esc(u.nombre)}</td>
+          <td>${esc(u.correo)}</td>
+          <td>
+            <select class="select-role" data-idx="${i}" data-accion="rol">
+              ${["cliente", "soporte", "administrador"].map(r =>
+                `<option value="${r}" ${r === u.rol ? "selected" : ""}>${r}</option>`).join("")}
+            </select>
+          </td>
+          <td><span class="badge ${esc(u.estado)}">${esc(u.estado)}</span></td>
+          <td class="row-actions">
+            <button class="icon-btn" data-idx="${i}" data-accion="estado">
+              ${u.estado === "activo" ? "Bloquear" : "Desbloquear"}
+            </button>
+          </td>
+        </tr>`).join("");
+    }
+    pintarUsuarios();
+
+    document.getElementById("tabla-usuarios").addEventListener("change", (e) => {
+      if (e.target.dataset.accion === "rol") {
+        const idx = Number(e.target.dataset.idx);
+        PERRONI_DB.usuarios[idx].rol = e.target.value;
+        pintarUsuarios();
+      }
+    });
+
+    document.getElementById("tabla-usuarios").addEventListener("click", (e) => {
+      if (e.target.dataset.accion === "estado") {
+        const idx = Number(e.target.dataset.idx);
+        const u = PERRONI_DB.usuarios[idx];
+        u.estado = u.estado === "activo" ? "bloqueado" : "activo";
+        u.intentosFallidos = 0;
+        pintarUsuarios();
+      }
+    });
+
+    document.getElementById("tabla-permisos").innerHTML =
+      Object.entries(PERRONI_DB.permisos).map(([rol, permisos]) => `
+        <tr>
+          <td><span class="role-pill ${esc(rol)}">${esc(rol)}</span></td>
+          <td class="mono" style="color:var(--ink-dim); font-size:0.82rem;">${permisos.map(esc).join(" · ")}</td>
+        </tr>`).join("");
+  }
+</script>
+</body>
+</html>

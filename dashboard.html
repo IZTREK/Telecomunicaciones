@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de usuario — PerroniPhone</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230a0e1c%27/%3E%3Crect x=%276%27 y=%2718%27 width=%274%27 height=%278%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3Crect x=%2713%27 y=%2712%27 width=%274%27 height=%2714%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3Crect x=%2720%27 y=%276%27 width=%274%27 height=%2720%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="app-sidebar">
+    <a href="index.html" class="brand"><span class="bars"><i></i><i></i><i></i><i></i></span> PerroniPhone</a>
+    <nav class="app-nav">
+      <a href="dashboard.html" class="active"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="10" width="3.4" height="7.5" rx="1"/><rect x="8.3" y="5.5" width="3.4" height="12" rx="1"/><rect x="14.1" y="2.5" width="3.4" height="15" rx="1"/></svg> Panel</a>
+      <a href="admin.html" id="link-admin"><svg class="nav-ic" viewBox="0 0 20 20"><circle cx="7" cy="6.5" r="3"/><path d="M1.5 17c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5" fill="none" stroke-width="1.6"/><circle cx="15" cy="7.5" r="2.4" fill="none" stroke-width="1.6"/><path d="M12.7 17c.2-2.6 1.9-4.4 4.3-4.4" fill="none" stroke-width="1.6"/></svg> Usuarios y roles</a>
+      <a href="index.html"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M2.5 9.5 10 3l7.5 6.5" fill="none" stroke-width="1.6"/><path d="M4.5 8.5V17h11V8.5" fill="none" stroke-width="1.6"/></svg> Portal público</a>
+    </nav>
+    <div class="session-card" id="session-card"></div>
+    <button class="btn btn-ghost btn-block" id="btn-logout" style="margin-top:14px;">Cerrar sesión</button>
+  </aside>
+
+  <main class="app-main">
+    <div class="app-header">
+      <div>
+        <h1 id="saludo">Panel de usuario</h1>
+        <p id="submensaje">Resumen de tu cuenta en PerroniPhone.</p>
+      </div>
+      <span class="badge activo" id="estado-badge">Sesión activa</span>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Tu plan actual</h2>
+        <p class="panel-sub">Datos de referencia (ficticios) asociados a tu cuenta.</p>
+        <div class="stat-row">
+          <div class="stat"><b>150 Mbps</b><span>Velocidad</span></div>
+          <div class="stat"><b>30 GB</b><span>Datos móviles</span></div>
+          <div class="stat"><b>$549</b><span>MXN / mes</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Tu cuenta</h2>
+        <p class="panel-sub">Información asociada a la sesión iniciada.</p>
+        <table>
+          <tbody id="cuenta-tabla"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-bitacora">
+      <h2>Actividad reciente de seguridad</h2>
+      <p class="panel-sub">Visible para roles de soporte y administración.</p>
+      <ul class="log-list" id="bitacora-lista"></ul>
+    </div>
+
+    <div class="panel">
+      <h2>Acerca de este panel</h2>
+      <p class="panel-sub">Nota académica</p>
+      <p style="color:var(--ink-dim); font-size:0.9rem;">
+        Este dashboard se genera enteramente en el navegador a partir de una
+        base de datos ficticia (<code>assets/js/db.js</code>) y de la sesión
+        creada al iniciar sesión. No hay servidor real detrás: es un
+        prototipo con fines educativos.
+      </p>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/db.js"></script>
+<script src="assets/js/auth.js"></script>
+<script>
+  const sesion = PERRONI_AUTH.requerirSesion(); // cualquier rol autenticado puede ver su panel
+  if (sesion) {
+    const esc = PERRONI_AUTH.escapeHTML;
+
+    document.getElementById("saludo").textContent = `Hola, ${sesion.nombre.split(" ")[0]}`;
+    document.getElementById("submensaje").textContent =
+      sesion.rol === "administrador" ? "Tienes acceso completo al portal."
+      : sesion.rol === "soporte" ? "Tienes acceso de consulta y monitoreo."
+      : "Este es el resumen de tu cuenta.";
+
+    document.getElementById("session-card").innerHTML = `
+      <div class="who">${esc(sesion.nombre)}</div>
+      <span class="role-pill ${esc(sesion.rol)}">${esc(sesion.rol)}</span>`;
+
+    document.getElementById("cuenta-tabla").innerHTML = `
+      <tr><td>ID de usuario</td><td class="cell-id">${esc(sesion.id)}</td></tr>
+      <tr><td>Correo</td><td>${esc(sesion.correo)}</td></tr>
+      <tr><td>Rol asignado</td><td><span class="role-pill ${esc(sesion.rol)}">${esc(sesion.rol)}</span></td></tr>
+      <tr><td>Sesión expira</td><td class="mono">${new Date(sesion.exp).toLocaleTimeString("es-MX")}</td></tr>`;
+
+    // Control de acceso por rol: la bitácora solo es visible para soporte/administrador.
+    if (PERRONI_AUTH.tienePermiso(sesion.rol, "ver_bitacora")) {
+      document.getElementById("bitacora-lista").innerHTML = PERRONI_DB.bitacora.map(ev => `
+        <li>
+          <span class="log-time">${esc(ev.hora)}</span>
+          <span class="log-${esc(ev.tipo)}">${esc(ev.mensaje)}</span>
+        </li>`).join("");
+    } else {
+      document.getElementById("panel-bitacora").style.display = "none";
+    }
+
+    // Oculta el enlace de administración si el rol no tiene permiso.
+    if (!PERRONI_AUTH.tienePermiso(sesion.rol, "gestionar_usuarios")) {
+      const link = document.getElementById("link-admin");
+      link.classList.add("locked");
+      link.removeAttribute("href");
+      link.title = "Tu rol no tiene acceso a esta sección";
+    }
+
+    document.getElementById("btn-logout").addEventListener("click", () => {
+      PERRONI_AUTH.cerrarSesion();
+      window.location.href = "login.html";
+    });
+  }
+</script>
+</body>
+</html>

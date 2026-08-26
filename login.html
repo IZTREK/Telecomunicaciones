@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acceder — PerroniPhone</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230a0e1c%27/%3E%3Crect x=%276%27 y=%2718%27 width=%274%27 height=%278%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3Crect x=%2713%27 y=%2712%27 width=%274%27 height=%2714%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3Crect x=%2720%27 y=%276%27 width=%274%27 height=%2720%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<div class="auth-shell">
+  <div class="auth-visual">
+    <a href="index.html" class="brand">
+      <span class="bars"><i></i><i></i><i></i><i></i></span> PerroniPhone
+    </a>
+    <div>
+      <span class="eyebrow"><span class="dot"></span> Acceso protegido</span>
+      <h2 style="font-size:1.7rem; max-width:16ch;">Un solo portal para colaboradores y clientes.</h2>
+      <p style="max-width:34ch;">Tu sesión se verifica con hash de contraseña, control de
+        intentos y permisos según tu rol dentro de la organización.</p>
+    </div>
+    <p class="mono" style="font-size:0.78rem; color:var(--ink-faint);">perroniphone.edu.mx · red simulada</p>
+  </div>
+
+  <div class="auth-form-side">
+    <div class="auth-box">
+      <h1>Inicia sesión</h1>
+      <p class="lead">Usa una de las cuentas de demostración o explora los mensajes de error del formulario.</p>
+
+      <div class="form-alert" id="alerta"></div>
+
+      <form id="form-login" novalidate>
+        <input type="hidden" id="csrf_token" name="csrf_token">
+
+        <div class="field">
+          <label for="correo">Correo institucional</label>
+          <div class="input-wrap">
+            <input type="email" id="correo" name="correo" autocomplete="username" placeholder="nombre@perroniphone.edu.mx" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="password">Contraseña</label>
+          <div class="input-wrap">
+            <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••" required>
+            <button type="button" class="toggle-visibility" id="btn-ver" aria-label="Mostrar contraseña">VER</button>
+          </div>
+          <p class="hint" id="hint-password"></p>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="btn-submit">Acceder al portal</button>
+      </form>
+
+      <div class="demo-creds">
+        <p>Cuentas de demostración</p>
+        <code>
+          admin@perroniphone.edu.mx · Admin#2026 (administrador)<br>
+          soporte@perroniphone.edu.mx · Soporte#2026 (soporte)<br>
+          cliente@perroniphone.edu.mx · Cliente#2026 (cliente)<br>
+          emilio.farias@perroniphone.edu.mx · Cliente#2026 (cuenta bloqueada)
+        </code>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/db.js"></script>
+<script src="assets/js/auth.js"></script>
+<script>
+  // Token anti-CSRF de demostración: se genera al cargar el formulario.
+  document.getElementById("csrf_token").value = PERRONI_AUTH.generarTokenCSRF();
+
+  // Si ya hay sesión vigente, no tiene caso volver a mostrar el login.
+  if (PERRONI_AUTH.obtenerSesion()) {
+    window.location.href = "dashboard.html";
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const alerta = document.getElementById("alerta");
+
+  function mostrarAlerta(tipo, mensaje) {
+    alerta.className = "form-alert show " + tipo;
+    alerta.textContent = mensaje;
+  }
+
+  if (params.get("motivo") === "sesion") {
+    mostrarAlerta("warn", "Tu sesión expiró o no ha iniciado sesión. Vuelve a acceder.");
+  } else if (params.get("motivo") === "permiso") {
+    mostrarAlerta("warn", "Tu rol no tiene permiso para ver esa sección.");
+  }
+
+  document.getElementById("btn-ver").addEventListener("click", (e) => {
+    const input = document.getElementById("password");
+    const visible = input.type === "text";
+    input.type = visible ? "password" : "text";
+    e.target.textContent = visible ? "VER" : "OCULTAR";
+  });
+
+  document.getElementById("password").addEventListener("input", (e) => {
+    const nivel = PERRONI_AUTH.fuerzaPassword(e.target.value);
+    const etiquetas = ["Muy débil", "Débil", "Aceptable", "Fuerte", "Muy fuerte"];
+    document.getElementById("hint-password").textContent =
+      e.target.value ? `Fuerza estimada: ${etiquetas[nivel]}` : "";
+  });
+
+  document.getElementById("form-login").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("btn-submit");
+    const correo = document.getElementById("correo").value.trim();
+    const password = document.getElementById("password").value;
+    const csrf = document.getElementById("csrf_token").value;
+
+    btn.disabled = true;
+    btn.textContent = "Verificando…";
+
+    const resultado = await PERRONI_AUTH.iniciarSesion(correo, password, csrf);
+
+    if (resultado.ok) {
+      mostrarAlerta("ok", "Acceso correcto. Redirigiendo…");
+      setTimeout(() => (window.location.href = "dashboard.html"), 500);
+    } else {
+      mostrarAlerta("error", resultado.mensaje);
+      btn.disabled = false;
+      btn.textContent = "Acceder al portal";
+      // Se renueva el token CSRF tras cada intento fallido.
+      document.getElementById("csrf_token").value = PERRONI_AUTH.generarTokenCSRF();
+    }
+  });
+</script>
+</body>
+</html>
