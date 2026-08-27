@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gobierno, riesgo y cumplimiento — PerroniPhone</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230a0e1c%27/%3E%3Crect x=%276%27 y=%2718%27 width=%274%27 height=%278%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3Crect x=%2713%27 y=%2712%27 width=%274%27 height=%2714%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3Crect x=%2720%27 y=%276%27 width=%274%27 height=%2720%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="app-sidebar">
+    <a href="index.html" class="brand"><span class="bars"><i></i><i></i><i></i><i></i></span> PerroniPhone</a>
+    <nav class="app-nav">
+      <a href="dashboard.html"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="10" width="3.4" height="7.5" rx="1"/><rect x="8.3" y="5.5" width="3.4" height="12" rx="1"/><rect x="14.1" y="2.5" width="3.4" height="15" rx="1"/></svg> Panel</a>
+      <a href="gobierno.html" class="active"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M10 2.2 16.5 5v5.2c0 4-2.7 6.6-6.5 7.6-3.8-1-6.5-3.6-6.5-7.6V5z" fill="none" stroke-width="1.6"/><path d="M7.2 10.2l2 2 3.6-4" fill="none" stroke-width="1.6"/></svg> Gobierno y riesgos</a>
+      <a href="admin.html" id="link-admin"><svg class="nav-ic" viewBox="0 0 20 20"><circle cx="7" cy="6.5" r="3"/><path d="M1.5 17c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5" fill="none" stroke-width="1.6"/><circle cx="15" cy="7.5" r="2.4" fill="none" stroke-width="1.6"/><path d="M12.7 17c.2-2.6 1.9-4.4 4.3-4.4" fill="none" stroke-width="1.6"/></svg> Usuarios y roles</a>
+      <a href="index.html"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M2.5 9.5 10 3l7.5 6.5" fill="none" stroke-width="1.6"/><path d="M4.5 8.5V17h11V8.5" fill="none" stroke-width="1.6"/></svg> Portal público</a>
+    </nav>
+    <div class="session-card" id="session-card"></div>
+    <button class="btn btn-ghost btn-block" id="btn-logout" style="margin-top:14px;">Cerrar sesión</button>
+  </aside>
+
+  <main class="app-main">
+    <div class="app-header">
+      <div>
+        <h1>Gobierno, riesgo y cumplimiento</h1>
+        <p>Matrices de activos, riesgos y controles que sustentan la operación de PerroniPhone.</p>
+      </div>
+      <span class="badge activo">Comité de TI</span>
+    </div>
+
+    <div class="panel">
+      <h2>Indicadores del periodo</h2>
+      <p class="panel-sub">KPI que el Comité de Dirección de TI revisa en cada sesión mensual.</p>
+      <div class="kpi-grid" id="kpi-grid"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Matriz de activos</h2>
+      <p class="panel-sub">
+        La criticidad toma el valor más alto entre confidencialidad, integridad y
+        disponibilidad: basta con que una propiedad se comprometa para afectar al negocio.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Activo</th><th>Tipo</th><th>C</th><th>I</th><th>D</th>
+              <th>Criticidad</th><th>Propietario</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-activos"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Mapa de calor de riesgos</h2>
+      <p class="panel-sub">
+        El nivel resulta de cruzar probabilidad e impacto. Cada ficha marca dónde
+        cae un riesgo identificado.
+      </p>
+      <div class="heat-wrap">
+        <div class="heat" id="mapa-calor"></div>
+      </div>
+      <div class="heat-legend">
+        <span><i class="critico"></i> Crítico</span>
+        <span><i class="alto"></i> Alto</span>
+        <span><i class="medio"></i> Medio</span>
+        <span><i class="bajo"></i> Bajo</span>
+      </div>
+      <p style="font-size:0.86rem; color:var(--ink-dim); margin-top:16px;">
+        R-03 alcanza nivel <strong>Alto</strong> pese a tener probabilidad <strong>Baja</strong>:
+        cuando el impacto es crítico, la baja frecuencia no basta para reducir la prioridad.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h2>Matriz de riesgos</h2>
+      <p class="panel-sub">Riesgos identificados sobre los activos, con su tratamiento y riesgo residual esperado.</p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Activo</th><th>Amenaza</th><th>Vulnerabilidad</th>
+              <th>Prob.</th><th>Impacto</th><th>Nivel</th><th>Residual</th><th>Controles</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-riesgos"></tbody>
+        </table>
+      </div>
+      <div id="detalle-riesgos"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Matriz de controles</h2>
+      <p class="panel-sub">
+        Cada control responde a un riesgo concreto. Los marcados como
+        <span class="tag link">demo</span> están implementados de forma simulada en este portal.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Control</th><th>Tipo</th><th>Función</th>
+              <th>Mitiga</th><th>Responsable</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-controles"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Documentación completa</h2>
+      <p class="panel-sub">Este tablero resume el análisis; el detalle vive en el repositorio.</p>
+      <ul class="log-list" style="font-family:var(--f-body); font-size:0.88rem;">
+        <li><span class="log-time">docs/01</span> <a href="docs/01-contexto.md">Contexto del proyecto</a></li>
+        <li><span class="log-time">docs/02</span> <a href="docs/02-gobierno-ti.md">Gobierno de TI</a></li>
+        <li><span class="log-time">docs/03</span> <a href="docs/03-alineacion-estrategica.md">Alineación estratégica</a></li>
+        <li><span class="log-time">docs/04</span> <a href="docs/04-matriz-activos.md">Matriz de activos</a></li>
+        <li><span class="log-time">docs/05</span> <a href="docs/05-matriz-riesgos.md">Matriz de riesgos</a></li>
+        <li><span class="log-time">docs/06</span> <a href="docs/06-matriz-controles.md">Matriz de controles</a></li>
+      </ul>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/db.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/grc.js"></script>
+<script>
+  // Los roles con acceso se derivan del permiso "ver_grc", no de una lista
+  // escrita a mano: la matriz de permisos es la única fuente de verdad.
+  const rolesConAcceso = Object.entries(PERRONI_DB.permisos)
+    .filter(([, permisos]) => permisos.includes("ver_grc"))
+    .map(([rol]) => rol);
+
+  const sesion = PERRONI_AUTH.requerirSesion(rolesConAcceso);
+
+  if (sesion) {
+    const esc = PERRONI_AUTH.escapeHTML;
+    // "Crítico" -> "critico": las clases CSS de nivel se escriben sin acento.
+    const ACENTOS = { "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u" };
+    const slug = (s) => s.toLowerCase().replace(/[áéíóú]/g, (c) => ACENTOS[c]);
+
+    document.getElementById("session-card").innerHTML = `
+      <div class="who">${esc(sesion.nombre)}</div>
+      <span class="role-pill ${esc(sesion.rol)}">${esc(sesion.rol)}</span>`;
+
+    document.getElementById("btn-logout").addEventListener("click", () => {
+      PERRONI_AUTH.cerrarSesion();
+      window.location.href = "login.html";
+    });
+
+    if (!PERRONI_AUTH.tienePermiso(sesion.rol, "gestionar_usuarios")) {
+      const link = document.getElementById("link-admin");
+      link.classList.add("locked");
+      link.removeAttribute("href");
+      link.title = "Tu rol no tiene acceso a esta sección";
+    }
+
+    // ---------- KPI ----------
+    document.getElementById("kpi-grid").innerHTML = PERRONI_GRC.kpis.map(k => `
+      <div class="kpi ${esc(k.estado)}">
+        <div class="kpi-name">${esc(k.nombre)}</div>
+        <div class="kpi-val">${esc(k.valor)}</div>
+        <div class="kpi-meta">Meta: ${esc(k.meta)}</div>
+      </div>`).join("");
+
+    // ---------- Matriz de activos ----------
+    document.getElementById("tabla-activos").innerHTML = PERRONI_GRC.activos.map(a => `
+      <tr>
+        <td class="cell-id">${esc(a.id)}</td>
+        <td>${esc(a.nombre)}</td>
+        <td>${esc(a.tipo)}</td>
+        <td>${esc(a.cia.confidencialidad)}</td>
+        <td>${esc(a.cia.integridad)}</td>
+        <td>${esc(a.cia.disponibilidad)}</td>
+        <td><span class="badge ${slug(a.criticidad)}">${esc(a.criticidad)}</span></td>
+        <td>${esc(a.propietario)}</td>
+      </tr>`).join("");
+
+    // ---------- Mapa de calor ----------
+    const impactos = PERRONI_GRC.escalas.impacto;                     // Bajo -> Crítico
+    const probabilidades = [...PERRONI_GRC.escalas.probabilidad].reverse(); // Alta -> Baja
+
+    let celdas = `<div class="heat-axis"></div>` +
+      impactos.map(i => `<div class="heat-axis">${esc(i)}</div>`).join("");
+
+    probabilidades.forEach(p => {
+      celdas += `<div class="heat-axis row">${esc(p)}</div>`;
+      impactos.forEach(i => {
+        const nivel = PERRONI_GRC.nivelDe(p, i);
+        const aqui = PERRONI_GRC.riesgosEn(p, i);
+        celdas += `
+          <div class="heat-cell ${slug(nivel)}" title="Probabilidad ${esc(p)} · Impacto ${esc(i)} = ${esc(nivel)}">
+            <span class="lvl">${esc(nivel)}</span>
+            <div>${aqui.map(r => `<span class="heat-chip">${esc(r.id)}</span>`).join(" ")}</div>
+          </div>`;
+      });
+    });
+    document.getElementById("mapa-calor").innerHTML = celdas;
+
+    // ---------- Matriz de riesgos ----------
+    document.getElementById("tabla-riesgos").innerHTML = PERRONI_GRC.riesgos.map(r => `
+      <tr>
+        <td class="cell-id">${esc(r.id)}</td>
+        <td class="cell-id">${esc(r.activo)}</td>
+        <td>${esc(r.amenaza)}</td>
+        <td>${esc(r.vulnerabilidad)}</td>
+        <td>${esc(r.probabilidad)}</td>
+        <td>${esc(r.impacto)}</td>
+        <td><span class="badge ${slug(r.nivel)}">${esc(r.nivel)}</span></td>
+        <td><span class="badge ${slug(r.residual)}">${esc(r.residual)}</span></td>
+        <td>${r.controles.map(c => `<span class="tag">${esc(c)}</span>`).join("")}</td>
+      </tr>`).join("");
+
+    document.getElementById("detalle-riesgos").innerHTML = PERRONI_GRC.riesgos.map(r => `
+      <details class="detalle">
+        <summary>${esc(r.id)} · ${esc(r.titulo)}</summary>
+        <div class="detalle-body">
+          <p><strong>Tratamiento:</strong> ${esc(r.tratamiento)}.
+             <strong>Regulador involucrado:</strong> ${esc(r.regulador)}.</p>
+          <p>Riesgo de nivel <strong>${esc(r.nivel)}</strong> sobre el activo
+             ${esc(r.activo)}. Según el apetito de riesgo del Comité de Dirección de TI,
+             un riesgo Alto requiere un control aprobado con responsable y fecha
+             compromiso en la misma sesión en que se presenta.</p>
+          <p>Controles aplicados: ${r.controles.map(id => {
+            const c = PERRONI_GRC.controles.find(x => x.id === id);
+            return `<span class="tag link">${esc(id)}</span> ${esc(c ? c.nombre : "")}`;
+          }).join(" · ")}</p>
+        </div>
+      </details>`).join("");
+
+    // ---------- Matriz de controles ----------
+    document.getElementById("tabla-controles").innerHTML = PERRONI_GRC.controles.map(c => `
+      <tr>
+        <td class="cell-id">${esc(c.id)}</td>
+        <td>
+          ${esc(c.nombre)}
+          ${c.enElPortal ? '<span class="tag link">demo</span>' : ""}
+          <div style="font-size:0.8rem; color:var(--ink-faint); margin-top:4px;">${esc(c.proposito)}</div>
+        </td>
+        <td>${esc(c.tipo)}</td>
+        <td>${esc(c.funcion)}</td>
+        <td>${c.mitiga.map(m => `<span class="tag">${esc(m)}</span>`).join("")}</td>
+        <td>${esc(c.responsable)}</td>
+      </tr>`).join("");
+  }
+</script>
+</body>
+</html>
