@@ -330,9 +330,16 @@ tbody tr:hover { background: rgba(237,239,247,0.02); }
 }
 .tag.link { color: var(--signal); border-color: rgba(0,230,195,0.3); }
 
-/* Tablas anchas: se desplazan dentro de su panel, nunca desbordan la página */
+/* Los hijos de un grid nacen con min-width:auto, asi que un contenido ancho
+   (una tabla) ensancha su columna y desborda la pagina. min-width:0 los deja
+   encogerse para que el desbordamiento se resuelva dentro del contenedor. */
+.grid-2 > *, .grid-3 > * { min-width: 0; }
+
+/* Tablas anchas: se desplazan dentro de su panel, nunca desbordan la pagina */
 .table-scroll { overflow-x: auto; }
 .table-scroll table { min-width: 640px; }
+/* Tablas de pocas columnas: caben sin desplazamiento */
+.table-scroll.narrow table { min-width: 0; }
 
 /* Matriz de calor probabilidad x impacto */
 .heat {
