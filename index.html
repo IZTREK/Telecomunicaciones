@@ -173,7 +173,7 @@
         <p>5 intentos fallidos bloquean la cuenta temporalmente para mitigar fuerza bruta.</p>
       </div>
     </div>
-    <p style="margin-top:24px;"><a href="SECURITY.md">Leer la documentación completa de decisiones de seguridad →</a></p>
+    <p style="margin-top:24px;"><a href="security.html">Leer la documentación completa de decisiones de seguridad →</a></p>
   </div>
 </section>
 
@@ -184,21 +184,31 @@
   </div>
 </footer>
 
-<script src="assets/js/db.js"></script>
+<script src="assets/js/api.js"></script>
 <script>
+  // Los planes ahora vienen de SQL Server a través de la API (catálogo público).
   const grid = document.getElementById("planes-grid");
-  PERRONI_DB.planes.forEach((p) => {
-    const el = document.createElement("div");
-    el.className = "card";
-    el.innerHTML = `
-      <span class="idx">${p.id}</span>
-      <h3>${p.nombre}</h3>
-      <p>${p.velocidad} · ${p.datosMoviles} de datos móviles</p>
-      <div class="stat-row" style="margin-top:14px;">
-        <div class="stat"><b>${p.precio}</b><span>Mensual</span></div>
-      </div>`;
-    grid.appendChild(el);
-  });
+  PERRONI_API.obtenerPlanes()
+    .then((planes) => {
+      grid.innerHTML = "";
+      planes.forEach((p) => {
+        const el = document.createElement("div");
+        el.className = "card";
+        el.innerHTML = `
+          <span class="idx">${p.id}</span>
+          <h3>${p.nombre}</h3>
+          <p>${p.velocidad} · ${p.datosMoviles} de datos móviles</p>
+          <div class="stat-row" style="margin-top:14px;">
+            <div class="stat"><b>${p.precio}</b><span>Mensual</span></div>
+          </div>`;
+        grid.appendChild(el);
+      });
+    })
+    .catch(() => {
+      grid.innerHTML = `<p style="color:var(--ink-faint); font-size:0.88rem;">
+        No se pudo conectar con la API (¿está corriendo <code>dotnet run</code>?).
+      </p>`;
+    });
 </script>
 </body>
 </html>

@@ -1,0 +1,12 @@
+# Compilados y temporales de .NET
+backend/PerroniPhoneApi/bin/
+backend/PerroniPhoneApi/obj/
+bin/
+obj/
+
+# Configuración local de VS Code (opcional, puedes quitar esta línea si quieres compartirla)
+.vscode/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db

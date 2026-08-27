@@ -31,8 +31,6 @@
       <div class="form-alert" id="alerta"></div>
 
       <form id="form-login" novalidate>
-        <input type="hidden" id="csrf_token" name="csrf_token">
-
         <div class="field">
           <label for="correo">Correo institucional</label>
           <div class="input-wrap">
@@ -65,12 +63,9 @@
   </div>
 </div>
 
-<script src="assets/js/db.js"></script>
+<script src="assets/js/api.js"></script>
 <script src="assets/js/auth.js"></script>
 <script>
-  // Token anti-CSRF de demostración: se genera al cargar el formulario.
-  document.getElementById("csrf_token").value = PERRONI_AUTH.generarTokenCSRF();
-
   // Si ya hay sesión vigente, no tiene caso volver a mostrar el login.
   if (PERRONI_AUTH.obtenerSesion()) {
     window.location.href = "dashboard.html";
@@ -109,12 +104,11 @@
     const btn = document.getElementById("btn-submit");
     const correo = document.getElementById("correo").value.trim();
     const password = document.getElementById("password").value;
-    const csrf = document.getElementById("csrf_token").value;
 
     btn.disabled = true;
     btn.textContent = "Verificando…";
 
-    const resultado = await PERRONI_AUTH.iniciarSesion(correo, password, csrf);
+    const resultado = await PERRONI_AUTH.iniciarSesion(correo, password);
 
     if (resultado.ok) {
       mostrarAlerta("ok", "Acceso correcto. Redirigiendo…");
@@ -123,8 +117,6 @@
       mostrarAlerta("error", resultado.mensaje);
       btn.disabled = false;
       btn.textContent = "Acceder al portal";
-      // Se renueva el token CSRF tras cada intento fallido.
-      document.getElementById("csrf_token").value = PERRONI_AUTH.generarTokenCSRF();
     }
   });
 </script>

@@ -60,51 +60,59 @@
       <h2>Acerca de este panel</h2>
       <p class="panel-sub">Nota académica</p>
       <p style="color:var(--ink-dim); font-size:0.9rem;">
-        Este dashboard se genera enteramente en el navegador a partir de una
-        base de datos ficticia (<code>assets/js/db.js</code>) y de la sesión
-        creada al iniciar sesión. No hay servidor real detrás: es un
-        prototipo con fines educativos.
+        Este dashboard consume una API real (ASP.NET Core) respaldada por
+        SQL Server. Tu sesión es un JWT firmado por el servidor, y la
+        bitácora que ves abajo se lee directamente de la base de datos.
       </p>
     </div>
   </main>
 </div>
 
-<script src="assets/js/db.js"></script>
+<script src="assets/js/api.js"></script>
 <script src="assets/js/auth.js"></script>
 <script>
   const sesion = PERRONI_AUTH.requerirSesion(); // cualquier rol autenticado puede ver su panel
   if (sesion) {
     const esc = PERRONI_AUTH.escapeHTML;
+    const u = sesion.usuario;
 
-    document.getElementById("saludo").textContent = `Hola, ${sesion.nombre.split(" ")[0]}`;
+    document.getElementById("saludo").textContent = `Hola, ${u.nombre.split(" ")[0]}`;
     document.getElementById("submensaje").textContent =
-      sesion.rol === "administrador" ? "Tienes acceso completo al portal."
-      : sesion.rol === "soporte" ? "Tienes acceso de consulta y monitoreo."
+      u.rol === "administrador" ? "Tienes acceso completo al portal."
+      : u.rol === "soporte" ? "Tienes acceso de consulta y monitoreo."
       : "Este es el resumen de tu cuenta.";
 
     document.getElementById("session-card").innerHTML = `
-      <div class="who">${esc(sesion.nombre)}</div>
-      <span class="role-pill ${esc(sesion.rol)}">${esc(sesion.rol)}</span>`;
+      <div class="who">${esc(u.nombre)}</div>
+      <span class="role-pill ${esc(u.rol)}">${esc(u.rol)}</span>`;
 
     document.getElementById("cuenta-tabla").innerHTML = `
-      <tr><td>ID de usuario</td><td class="cell-id">${esc(sesion.id)}</td></tr>
-      <tr><td>Correo</td><td>${esc(sesion.correo)}</td></tr>
-      <tr><td>Rol asignado</td><td><span class="role-pill ${esc(sesion.rol)}">${esc(sesion.rol)}</span></td></tr>
-      <tr><td>Sesión expira</td><td class="mono">${new Date(sesion.exp).toLocaleTimeString("es-MX")}</td></tr>`;
+      <tr><td>ID de usuario</td><td class="cell-id">${esc(u.codigoUsuario)}</td></tr>
+      <tr><td>Correo</td><td>${esc(u.correo)}</td></tr>
+      <tr><td>Rol asignado</td><td><span class="role-pill ${esc(u.rol)}">${esc(u.rol)}</span></td></tr>
+      <tr><td>Sesión expira</td><td class="mono">${new Date(sesion.expira).toLocaleTimeString("es-MX")}</td></tr>`;
 
     // Control de acceso por rol: la bitácora solo es visible para soporte/administrador.
-    if (PERRONI_AUTH.tienePermiso(sesion.rol, "ver_bitacora")) {
-      document.getElementById("bitacora-lista").innerHTML = PERRONI_DB.bitacora.map(ev => `
-        <li>
-          <span class="log-time">${esc(ev.hora)}</span>
-          <span class="log-${esc(ev.tipo)}">${esc(ev.mensaje)}</span>
-        </li>`).join("");
+    // El backend también rechaza la petición (403) si el rol no tiene permiso.
+    if (PERRONI_AUTH.tienePermiso(u.rol, "ver_bitacora")) {
+      PERRONI_API.obtenerBitacora(sesion.token)
+        .then((eventos) => {
+          document.getElementById("bitacora-lista").innerHTML = eventos.map(ev => `
+            <li>
+              <span class="log-time">${esc(new Date(ev.fecha).toLocaleString("es-MX"))}</span>
+              <span class="log-${esc(ev.tipo)}">${esc(ev.mensaje)}</span>
+            </li>`).join("");
+        })
+        .catch(() => {
+          document.getElementById("bitacora-lista").innerHTML =
+            `<li style="color:var(--ink-faint);">No se pudo cargar la bitácora (¿está corriendo la API?).</li>`;
+        });
     } else {
       document.getElementById("panel-bitacora").style.display = "none";
     }
 
     // Oculta el enlace de administración si el rol no tiene permiso.
-    if (!PERRONI_AUTH.tienePermiso(sesion.rol, "gestionar_usuarios")) {
+    if (!PERRONI_AUTH.tienePermiso(u.rol, "gestionar_usuarios")) {
       const link = document.getElementById("link-admin");
       link.classList.add("locked");
       link.removeAttribute("href");

@@ -32,7 +32,7 @@
 
     <div class="panel">
       <h2>Directorio de usuarios</h2>
-      <p class="panel-sub">Los cambios se aplican en memoria durante esta sesión del navegador (demo sin backend).</p>
+      <p class="panel-sub">Los cambios se guardan en SQL Server a través de la API — persisten aunque recargues la página.</p>
       <table>
         <thead>
           <tr>
@@ -54,16 +54,17 @@
   </main>
 </div>
 
-<script src="assets/js/db.js"></script>
+<script src="assets/js/api.js"></script>
 <script src="assets/js/auth.js"></script>
 <script>
   const sesion = PERRONI_AUTH.requerirSesion(["administrador"]);
   if (sesion) {
     const esc = PERRONI_AUTH.escapeHTML;
+    let usuarios = [];
 
     document.getElementById("session-card").innerHTML = `
-      <div class="who">${esc(sesion.nombre)}</div>
-      <span class="role-pill ${esc(sesion.rol)}">${esc(sesion.rol)}</span>`;
+      <div class="who">${esc(sesion.usuario.nombre)}</div>
+      <span class="role-pill ${esc(sesion.usuario.rol)}">${esc(sesion.usuario.rol)}</span>`;
 
     document.getElementById("btn-logout").addEventListener("click", () => {
       PERRONI_AUTH.cerrarSesion();
@@ -72,47 +73,75 @@
 
     function pintarUsuarios() {
       const tbody = document.getElementById("tabla-usuarios");
-      tbody.innerHTML = PERRONI_DB.usuarios.map((u, i) => `
+      tbody.innerHTML = usuarios.map((u) => `
         <tr>
-          <td class="cell-id">${esc(u.id)}</td>
+          <td class="cell-id">${esc(u.codigoUsuario)}</td>
           <td>${esc(u.nombre)}</td>
           <td>${esc(u.correo)}</td>
           <td>
-            <select class="select-role" data-idx="${i}" data-accion="rol">
+            <select class="select-role" data-id="${u.id}" data-accion="rol">
               ${["cliente", "soporte", "administrador"].map(r =>
                 `<option value="${r}" ${r === u.rol ? "selected" : ""}>${r}</option>`).join("")}
             </select>
           </td>
           <td><span class="badge ${esc(u.estado)}">${esc(u.estado)}</span></td>
           <td class="row-actions">
-            <button class="icon-btn" data-idx="${i}" data-accion="estado">
+            <button class="icon-btn" data-id="${u.id}" data-accion="estado" data-estado-actual="${esc(u.estado)}">
               ${u.estado === "activo" ? "Bloquear" : "Desbloquear"}
             </button>
           </td>
         </tr>`).join("");
     }
-    pintarUsuarios();
 
-    document.getElementById("tabla-usuarios").addEventListener("change", (e) => {
+    async function cargarUsuarios() {
+      const tbody = document.getElementById("tabla-usuarios");
+      tbody.innerHTML = `<tr><td colspan="6" style="color:var(--ink-faint);">Cargando desde SQL Server…</td></tr>`;
+      try {
+        usuarios = await PERRONI_API.obtenerUsuarios(sesion.token);
+        pintarUsuarios();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" style="color:var(--danger);">
+          No se pudo cargar el directorio (¿está corriendo la API en dotnet run?). ${esc(err.message)}
+        </td></tr>`;
+      }
+    }
+    cargarUsuarios();
+
+    document.getElementById("tabla-usuarios").addEventListener("change", async (e) => {
       if (e.target.dataset.accion === "rol") {
-        const idx = Number(e.target.dataset.idx);
-        PERRONI_DB.usuarios[idx].rol = e.target.value;
-        pintarUsuarios();
+        const id = Number(e.target.dataset.id);
+        try {
+          await PERRONI_API.actualizarRol(sesion.token, id, e.target.value);
+          await cargarUsuarios(); // se vuelve a leer de la base para reflejar el estado real
+        } catch (err) {
+          alert("No se pudo actualizar el rol: " + err.message);
+          cargarUsuarios();
+        }
       }
     });
 
-    document.getElementById("tabla-usuarios").addEventListener("click", (e) => {
+    document.getElementById("tabla-usuarios").addEventListener("click", async (e) => {
       if (e.target.dataset.accion === "estado") {
-        const idx = Number(e.target.dataset.idx);
-        const u = PERRONI_DB.usuarios[idx];
-        u.estado = u.estado === "activo" ? "bloqueado" : "activo";
-        u.intentosFallidos = 0;
-        pintarUsuarios();
+        const id = Number(e.target.dataset.id);
+        const nuevoEstado = e.target.dataset.estadoActual === "activo" ? "bloqueado" : "activo";
+        e.target.disabled = true;
+        try {
+          await PERRONI_API.actualizarEstado(sesion.token, id, nuevoEstado);
+          await cargarUsuarios();
+        } catch (err) {
+          alert("No se pudo actualizar el estado: " + err.message);
+          e.target.disabled = false;
+        }
       }
     });
 
+    const permisosPorRol = {
+      administrador: ["ver_dashboard", "gestionar_usuarios", "ver_bitacora", "editar_roles"],
+      soporte: ["ver_dashboard", "ver_bitacora"],
+      cliente: ["ver_dashboard"],
+    };
     document.getElementById("tabla-permisos").innerHTML =
-      Object.entries(PERRONI_DB.permisos).map(([rol, permisos]) => `
+      Object.entries(permisosPorRol).map(([rol, permisos]) => `
         <tr>
           <td><span class="role-pill ${esc(rol)}">${esc(rol)}</span></td>
           <td class="mono" style="color:var(--ink-dim); font-size:0.82rem;">${permisos.map(esc).join(" · ")}</td>

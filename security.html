@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documentación de seguridad — PerroniPhone</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230a0e1c%27/%3E%3Crect x=%276%27 y=%2718%27 width=%274%27 height=%278%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3Crect x=%2713%27 y=%2712%27 width=%274%27 height=%2714%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3Crect x=%2720%27 y=%276%27 width=%274%27 height=%2720%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/styles.css">
+<style>
+  .doc-shell { max-width: 780px; margin: 0 auto; padding: 56px 28px 100px; }
+  .doc-shell h1 { font-size: clamp(1.6rem, 3vw, 2.1rem); margin-bottom: 10px; }
+  .doc-shell > p.lead { font-size: 1rem; max-width: 62ch; }
+  .doc-quote {
+    border-left: 3px solid var(--signal); background: var(--signal-soft);
+    padding: 14px 18px; border-radius: 0 8px 8px 0; font-size: 0.92rem; color: var(--ink-dim); margin: 26px 0 40px;
+  }
+  .doc-quote b { color: var(--ink); }
+  .doc-section { margin-bottom: 44px; }
+  .doc-section > h2 {
+    font-size: 1.2rem; display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+    padding-bottom: 12px; border-bottom: 1px solid var(--line);
+  }
+  .doc-section > h2 .num {
+    font-family: var(--f-mono); font-size: 0.78rem; color: var(--signal);
+    background: var(--signal-soft); border: 1px solid rgba(0,230,195,0.25);
+    width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .control { background: var(--bg-panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 22px 24px; margin-bottom: 16px; }
+  .control h3 { font-size: 0.98rem; margin-bottom: 12px; }
+  .control dl { margin: 0; }
+  .control dt {
+    font-family: var(--f-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--signal); margin-bottom: 6px; margin-top: 16px;
+  }
+  .control dt:first-child { margin-top: 0; }
+  .control dt.limite { color: var(--alert); }
+  .control dd { margin: 0; font-size: 0.9rem; color: var(--ink-dim); }
+  .control code { background: var(--bg-elevated); padding: 1px 6px; border-radius: 4px; font-size: 0.85em; color: var(--ink); }
+
+  .doc-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); }
+  .doc-table-wrap table { min-width: 640px; }
+  .doc-table-wrap thead th { background: var(--bg-panel); }
+  .doc-table-wrap td { font-size: 0.85rem; color: var(--ink-dim); }
+  .doc-table-wrap td:first-child { color: var(--ink); }
+
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 0.86rem; margin-bottom: 30px; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="shell">
+    <a href="index.html" class="brand">
+      <span class="bars"><i></i><i></i><i></i><i></i></span>
+      PerroniPhone
+    </a>
+    <div class="navlinks">
+      <a href="index.html#organizacion">Organización</a>
+      <a href="index.html#planes">Planes</a>
+      <a href="security.html" class="active">Seguridad</a>
+      <a href="login.html" class="btn btn-primary">Acceder al portal</a>
+    </div>
+  </div>
+</nav>
+
+<div class="doc-shell">
+  <a href="index.html" class="back-link">← Volver al portal</a>
+
+  <span class="eyebrow"><span class="dot"></span> Documentación técnica</span>
+  <h1>Decisiones de seguridad — Portal PerroniPhone</h1>
+  <p class="lead">
+    Este documento explica <b>qué</b> controles de seguridad se implementaron en el
+    portal académico de PerroniPhone, <b>por qué</b> se eligieron y <b>cuáles son sus
+    límites</b> al tratarse de un sitio estático (sin servidor real). El objetivo
+    es que la implementación sea evaluable como ejercicio de seguridad aplicada,
+    no solo como interfaz visual.
+  </p>
+
+  <div class="doc-quote">
+    <b>Alcance del proyecto:</b> ASP.NET Core Web API + SQL Server como
+    backend, consumido por un frontend HTML/CSS/JavaScript. Todos los
+    usuarios, correos y contraseñas son ficticios. Las secciones marcadas
+    como "límite conocido" en versiones anteriores de este documento ahora
+    están resueltas del lado del servidor; se conservan aquí para mostrar
+    la evolución del diseño.
+  </div>
+
+  <div class="control" style="border-color:rgba(0,230,195,0.35); margin-bottom:40px;">
+    <h3 style="color:var(--signal);">Actualización: de prototipo estático a backend real</h3>
+    <dl>
+      <dt>Qué cambió</dt>
+      <dd>
+        El hashing de contraseñas pasó de SHA-256 simple (calculado en el
+        navegador) a <b>PBKDF2 con 100,000 iteraciones</b>, calculado y
+        verificado únicamente en el servidor (<code>PasswordHasher.cs</code>).
+        La sesión pasó de un token sin firmar en <code>sessionStorage</code>
+        a un <b>JWT firmado</b> por la API (<code>TokenService.cs</code>),
+        que el cliente no puede alterar. El control de acceso por rol ahora
+        se aplica también en cada endpoint con
+        <code>[Authorize(Roles = "...")]</code>, no solo ocultando botones.
+        El bloqueo por intentos fallidos vive en la tabla <code>Usuarios</code>
+        de SQL Server, no en el navegador. Y todas las consultas usan
+        parámetros (Dapper), lo que previene inyección SQL.
+      </dd>
+    </dl>
+  </div>
+
+  <div class="doc-section">
+    <h2><span class="num">1</span> Autenticación</h2>
+
+    <div class="control">
+      <h3>1.1 Contraseñas nunca en texto plano</h3>
+      <dl>
+        <dt>Decisión</dt>
+        <dd>Cada fila en la tabla <code>Usuarios</code> de SQL Server guarda
+          un <code>Salt</code> aleatorio y un <code>HashPassword</code>
+          derivado con <b>PBKDF2 (HMAC-SHA256, 100,000 iteraciones)</b>,
+          calculado y verificado únicamente en el servidor
+          (<code>Services/PasswordHasher.cs</code>). La contraseña que
+          escribes en el formulario viaja al backend por HTTPS/HTTP y ahí se
+          verifica; nunca se compara ni se guarda en texto plano.</dd>
+        <dt>Por qué</dt>
+        <dd>PBKDF2 está diseñado específicamente para contraseñas: es lento
+          a propósito, lo que dificulta ataques de fuerza bruta y de
+          diccionario, a diferencia de un hash genérico como SHA-256 solo.</dd>
+        <dt style="color:var(--signal);">Resuelto respecto a la v1</dt>
+        <dd>La primera versión del proyecto (sin backend) calculaba SHA-256
+          en el propio navegador. Ahora el cómputo ocurre exclusivamente en
+          el servidor, que es como debe hacerse en producción.</dd>
+      </dl>
+    </div>
+
+    <div class="control">
+      <h3>1.2 Mensajes de error genéricos</h3>
+      <dl>
+        <dt>Decisión</dt>
+        <dd>Si el correo no existe o la contraseña es incorrecta, se muestra el
+          mismo mensaje ("Correo o contraseña incorrectos").</dd>
+        <dt>Por qué</dt>
+        <dd>Evita que un atacante pueda enumerar qué correos están registrados
+          en el sistema (<i>user enumeration</i>).</dd>
+      </dl>
+    </div>
+
+    <div class="control">
+      <h3>1.3 Bloqueo por intentos fallidos (mitigación de fuerza bruta)</h3>
+      <dl>
+        <dt>Decisión</dt>
+        <dd>Tras 5 intentos fallidos sobre el mismo correo, la cuenta se
+          bloquea temporalmente 2 minutos (<code>registrarIntentoFallido</code>
+          en <code>auth.js</code>). Además, el directorio de usuarios incluye
+          una cuenta ya bloqueada de forma permanente para demostrar el estado
+          "bloqueado" administrado manualmente.</dd>
+        <dt class="limite">Límite conocido</dt>
+        <dd>El conteo vive en <code>sessionStorage</code> del navegador, por
+          lo que un atacante podría evadirlo abriendo una pestaña nueva. En
+          producción, el conteo debe llevarse en el servidor, idealmente por
+          combinación de cuenta + dirección IP, con <i>rate limiting</i> a
+          nivel de infraestructura (por ejemplo, un WAF o middleware
+          dedicado).</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="doc-section">
+    <h2><span class="num">2</span> Gestión de sesión</h2>
+    <div class="control">
+      <dl>
+        <dt>Decisión</dt>
+        <dd>Al autenticarse, se genera un objeto de sesión (<code>id</code>,
+          <code>rol</code>, <code>correo</code>, tiempos de emisión/expiración)
+          codificado en Base64 y guardado en <code>sessionStorage</code>, con
+          expiración de 20 minutos. Cada página protegida llama a
+          <code>requerirSesion()</code> antes de mostrar contenido.</dd>
+        <dt>Por qué <code>sessionStorage</code> y no <code>localStorage</code></dt>
+        <dd><code>sessionStorage</code> se destruye al cerrar la
+          pestaña/navegador, reduciendo la ventana de exposición frente a
+          <code>localStorage</code>, que persiste indefinidamente.</dd>
+        <dt class="limite">Límite conocido</dt>
+        <dd>Este token <b>no está firmado criptográficamente</b>; cualquier
+          persona con las herramientas de desarrollador del navegador podría
+          editarlo. Es aceptable solo porque no hay datos reales ni backend
+          que confíe en ese token. En producción, la sesión debe representarse
+          con una <b>cookie httpOnly, Secure y SameSite=Strict</b>, o un JWT
+          firmado por el servidor y validado en cada petición.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="doc-section">
+    <h2><span class="num">3</span> Control de acceso basado en roles (RBAC)</h2>
+    <div class="control">
+      <dl>
+        <dt>Decisión</dt>
+        <dd>Existen tres roles — <code>administrador</code>, <code>soporte</code>
+          y <code>cliente</code> — cada uno con una lista explícita de
+          permisos. El dashboard oculta secciones en el navegador según el
+          permiso del rol, <b>y además</b> cada endpoint sensible de la API
+          está marcado con <code>[Authorize(Roles = "administrador")]</code>
+          (por ejemplo, <code>PUT /api/usuarios/{id}/rol</code>), por lo que
+          el servidor rechaza la petición con <code>403</code> aunque alguien
+          intente llamarla directamente sin pasar por la interfaz.</dd>
+        <dt>Por qué</dt>
+        <dd>El principio de <b>mínimo privilegio</b>: cada rol ve y hace solo
+          lo necesario para su función.</dd>
+        <dt style="color:var(--signal);">Resuelto respecto a la v1</dt>
+        <dd>En la primera versión, ocultar botones en el DOM era la única
+          barrera ("seguridad de interfaz"). Ahora la autorización se
+          revalida en cada endpoint del backend, que es la barrera real.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="doc-section">
+    <h2><span class="num">4</span> Protección contra XSS</h2>
+    <div class="control">
+      <dl>
+        <dt>Decisión</dt>
+        <dd>Toda información dinámica que proviene de la "base de datos"
+          (nombres, correos, roles) se inserta en el DOM a través de la
+          función <code>escapeHTML()</code>, que convierte caracteres como
+          <code>&lt;</code>, <code>&gt;</code> y <code>"</code> en entidades
+          HTML antes de escribirlos.</dd>
+        <dt>Por qué</dt>
+        <dd>Modela la disciplina de nunca insertar texto no controlado
+          directamente en el HTML, la causa más común de XSS en aplicaciones
+          reales.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="doc-section">
+    <h2><span class="num">5</span> Protección conceptual contra CSRF</h2>
+    <div class="control">
+      <dl>
+        <dt>Decisión</dt>
+        <dd>El formulario de login incluye un campo oculto
+          <code>csrf_token</code>, generado con <code>crypto.randomUUID()</code>
+          y guardado en <code>sessionStorage</code>. Al enviar el formulario,
+          se valida que el token coincida, y se genera uno nuevo tras cada
+          intento.</dd>
+        <dt class="limite">Límite conocido</dt>
+        <dd>Un token CSRF solo protege de verdad cuando lo <b>emite y valida
+          el servidor</b> en cada envío que modifique estado. Aquí es un
+          ejercicio didáctico del patrón, no una protección efectiva por
+          sí sola.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="doc-section">
+    <h2><span class="num">6</span> Validación de entradas</h2>
+    <div class="control">
+      <dl>
+        <dt>Decisión</dt>
+        <dd>El correo se valida con una expresión regular antes de intentar
+          autenticar, y la contraseña recibe retroalimentación de fuerza en
+          tiempo real sin bloquear el envío, para no filtrar la política
+          exacta de contraseñas a un posible atacante.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="doc-section">
+    <h2><span class="num">7</span> Bitácora de seguridad (auditoría)</h2>
+    <div class="control">
+      <dl>
+        <dt>Decisión</dt>
+        <dd>La tabla <code>Bitacora</code> en SQL Server registra eventos
+          reales (accesos correctos, intentos fallidos, bloqueos, cambios de
+          rol) cada vez que ocurren, insertados directamente por
+          <code>AuthController</code> y <code>UsuariosController</code>. El
+          endpoint <code>GET /api/bitacora</code> solo es accesible para los
+          roles <code>soporte</code> y <code>administrador</code>.</dd>
+        <dt>Por qué</dt>
+        <dd>La trazabilidad es un control de seguridad en sí mismo: permite
+          detectar y explicar incidentes después de que ocurren.</dd>
+        <dt style="color:var(--signal);">Resuelto respecto a la v1</dt>
+        <dd>Antes era un arreglo estático de ejemplo en JavaScript. Ahora es
+          un registro persistente en la base de datos, protegido por el
+          mismo control de acceso por rol que el resto de la API.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="doc-section">
+    <h2><span class="num">8</span> Resumen de límites generales</h2>
+    <p style="font-size:0.92rem;">
+      Por ser un proyecto 100% del lado del cliente, ningún control aquí
+      sustituye una implementación real de backend. La tabla resume el
+      paralelismo entre lo simulado y lo recomendado en producción:
+    </p>
+    <div class="doc-table-wrap">
+      <table>
+        <thead>
+          <tr><th>Control simulado en el portal</th><th>Equivalente recomendado en producción</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Hash SHA-256 + salt en el navegador</td><td>bcrypt/Argon2 calculado y verificado en el servidor</td></tr>
+          <tr><td>Token de sesión en sessionStorage</td><td>Cookie httpOnly + Secure + SameSite, o JWT firmado</td></tr>
+          <tr><td>Bloqueo por intentos en el cliente</td><td>Rate limiting por cuenta + IP en el servidor/WAF</td></tr>
+          <tr><td>RBAC que oculta botones en el DOM</td><td>Autorización revalidada en cada endpoint del backend</td></tr>
+          <tr><td>Token CSRF simulado</td><td>Token CSRF emitido y validado por el servidor</td></tr>
+          <tr><td>Bitácora estática de ejemplo</td><td>Registro de auditoría persistente y protegido</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.92rem; margin-top:20px;">
+      Este enfoque permite demostrar el razonamiento y las decisiones de
+      diseño de seguridad propias de un portal corporativo, dentro de las
+      restricciones de un proyecto académico sin infraestructura de servidor.
+    </p>
+  </div>
+</div>
+
+<footer>
+  <div class="shell">
+    <div class="brand"><span class="bars"><i></i><i></i><i></i><i></i></span> PerroniPhone</div>
+    <p>Proyecto académico · Compañía y datos completamente ficticios · 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>

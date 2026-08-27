@@ -6,10 +6,37 @@ límites** al tratarse de un sitio estático (sin servidor real). El objetivo
 es que la implementación sea evaluable como ejercicio de seguridad
 aplicada, no solo como interfaz visual.
 
-> **Alcance del proyecto**: HTML + CSS + JavaScript en el navegador, sin
-> backend ni base de datos real. Todos los usuarios, correos y contraseñas
-> son ficticios. Donde un control depende de infraestructura de servidor,
-> se indica explícitamente cómo se resolvería en producción.
+> **Alcance del proyecto**: ASP.NET Core Web API + SQL Server como backend,
+> consumido por un frontend HTML/CSS/JavaScript. Todos los usuarios, correos
+> y contraseñas son ficticios.
+
+## Actualización: de prototipo estático a backend real
+
+Esta es la segunda versión del proyecto. La primera era 100% del lado del
+cliente (sin servidor); esta versión agrega un backend en ASP.NET Core y
+una base de datos en SQL Server, lo que resuelve varias de las limitaciones
+documentadas originalmente:
+
+- El hashing de contraseñas pasó de SHA-256 simple (en el navegador) a
+  **PBKDF2 con 100,000 iteraciones**, calculado y verificado solo en el
+  servidor (`Services/PasswordHasher.cs`).
+- La sesión pasó de un token sin firmar en `sessionStorage` a un **JWT
+  firmado** por la API (`Services/TokenService.cs`); el cliente ya no puede
+  alterar su propio rol o id.
+- El control de acceso por rol (RBAC) ahora se aplica también en cada
+  endpoint con `[Authorize(Roles = "...")]`, no solo ocultando botones en
+  el HTML.
+- El bloqueo por intentos fallidos vive en la tabla `Usuarios` de SQL
+  Server (columnas `IntentosFallidos`, `BloqueadoHasta`), no en el
+  navegador — persiste entre sesiones y no se puede evadir abriendo una
+  pestaña nueva.
+- Todas las consultas a la base de datos usan parámetros vía Dapper
+  (`@Correo`, `@Id`, etc.), nunca concatenación de strings, lo que previene
+  **inyección SQL**.
+
+Las secciones siguientes se conservan tal como se documentaron en la
+primera versión (para mostrar el razonamiento original) y se marcan cuando
+el "límite conocido" ya fue resuelto por el backend actual.
 
 ---
 
