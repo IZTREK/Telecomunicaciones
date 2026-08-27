@@ -20,6 +20,7 @@
       <a href="#organizacion">Organización</a>
       <a href="#planes">Planes</a>
       <a href="#seguridad">Seguridad</a>
+      <a href="#gobierno">Gobierno</a>
       <a href="login.html" class="btn btn-primary">Acceder al portal</a>
     </div>
   </div>
@@ -177,6 +178,56 @@
   </div>
 </section>
 
+<section id="gobierno">
+  <div class="shell">
+    <div class="section-head">
+      <span class="eyebrow"><span class="dot"></span> Gobierno de TI</span>
+      <h2>Cómo se decide y se mide la seguridad</h2>
+      <p>Los controles del portal no salen de la nada: responden a un análisis de
+        gobierno, riesgo y cumplimiento que define qué se protege, de qué se
+        protege y con qué se protege.</p>
+    </div>
+
+    <div class="grid-3" id="grc-resumen"></div>
+
+    <div class="grid-2" style="margin-top:20px;">
+      <div class="card">
+        <h3>Riesgos identificados</h3>
+        <p>Los tres riesgos evaluados quedaron en nivel Alto. Según el apetito de
+          riesgo del Comité de Dirección de TI, ninguno puede simplemente
+          aceptarse: todos exigen un control con responsable y fecha compromiso.</p>
+        <div class="table-scroll narrow" style="margin-top:16px;">
+          <table>
+            <thead><tr><th>ID</th><th>Riesgo</th><th>Nivel</th><th>Residual</th></tr></thead>
+            <tbody id="grc-riesgos"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Marco regulatorio</h3>
+        <p>La empresa opera bajo obligaciones concretas. Incumplirlas no es solo
+          un incidente técnico: es una sanción que puede detener la operación.</p>
+        <div class="table-scroll narrow" style="margin-top:16px;">
+          <table>
+            <thead><tr><th>Regulador</th><th>Obligación principal</th></tr></thead>
+            <tbody>
+              <tr><td>IFT</td><td>Neutralidad de la red y calidad del servicio</td></tr>
+              <tr><td>INAI (LFPDPPP)</td><td>Derechos ARCO y cifrado de datos personales</td></tr>
+              <tr><td>PROFECO</td><td>Disponibilidad para quejas y garantías (NOM-184-SCFI)</td></tr>
+              <tr><td>SEDECYT</td><td>Alineación con la Agenda Digital de Aguascalientes</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin-top:24px;">
+      <a href="docs/02-gobierno-ti.md">Leer el análisis de gobierno de TI →</a>
+    </p>
+  </div>
+</section>
+
 <footer>
   <div class="shell">
     <div class="brand"><span class="bars"><i></i><i></i><i></i><i></i></span> PerroniPhone</div>
@@ -185,20 +236,65 @@
 </footer>
 
 <script src="assets/js/db.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/grc.js"></script>
 <script>
+  // Todo dato dinámico se escapa antes de escribirlo en el DOM, aunque aquí
+  // provenga de un archivo propio: es la misma disciplina que aplica el portal.
+  const esc = PERRONI_AUTH.escapeHTML;
+  const slug = (s) => s.toLowerCase().replace(/[áéíóú]/g, (c) => ({ "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u" }[c]));
+
   const grid = document.getElementById("planes-grid");
   PERRONI_DB.planes.forEach((p) => {
     const el = document.createElement("div");
     el.className = "card";
     el.innerHTML = `
-      <span class="idx">${p.id}</span>
-      <h3>${p.nombre}</h3>
-      <p>${p.velocidad} · ${p.datosMoviles} de datos móviles</p>
+      <span class="idx">${esc(p.id)}</span>
+      <h3>${esc(p.nombre)}</h3>
+      <p>${esc(p.velocidad)} · ${esc(p.datosMoviles)} de datos móviles</p>
       <div class="stat-row" style="margin-top:14px;">
-        <div class="stat"><b>${p.precio}</b><span>Mensual</span></div>
+        <div class="stat"><b>${esc(p.precio)}</b><span>Mensual</span></div>
       </div>`;
     grid.appendChild(el);
   });
+
+  // Resumen del análisis GRC. Los conteos se derivan de las matrices para que
+  // el sitio público nunca contradiga a la documentación.
+  const resumen = [
+    {
+      titulo: "Activos identificados",
+      total: PERRONI_GRC.activos.length,
+      pie: `${PERRONI_GRC.activos.filter((a) => a.criticidad === "Crítica" || a.criticidad === "Alta").length} de criticidad alta o crítica`,
+      doc: "docs/04-matriz-activos.md",
+    },
+    {
+      titulo: "Riesgos evaluados",
+      total: PERRONI_GRC.riesgos.length,
+      pie: `${PERRONI_GRC.riesgos.filter((r) => r.nivel === "Alto" || r.nivel === "Crítico").length} en nivel alto o superior`,
+      doc: "docs/05-matriz-riesgos.md",
+    },
+    {
+      titulo: "Controles definidos",
+      total: PERRONI_GRC.controles.length,
+      pie: `${PERRONI_GRC.controles.filter((c) => c.tipo.includes("Técnico")).length} de tipo técnico`,
+      doc: "docs/06-matriz-controles.md",
+    },
+  ];
+
+  document.getElementById("grc-resumen").innerHTML = resumen.map((r) => `
+    <div class="card">
+      <span class="idx">${esc(r.titulo)}</span>
+      <div class="stat-row"><div class="stat"><b>${esc(r.total)}</b><span>${esc(r.pie)}</span></div></div>
+      <p style="margin-top:14px;"><a href="${esc(r.doc)}">Ver la matriz →</a></p>
+    </div>`).join("");
+
+  document.getElementById("grc-riesgos").innerHTML = PERRONI_GRC.riesgos.map((r) => `
+    <tr>
+      <td class="cell-id">${esc(r.id)}</td>
+      <td>${esc(r.titulo)}</td>
+      <td><span class="badge ${slug(r.nivel)}">${esc(r.nivel)}</span></td>
+      <td><span class="badge ${slug(r.residual)}">${esc(r.residual)}</span></td>
+    </tr>`).join("");
 </script>
 </body>
 </html>
