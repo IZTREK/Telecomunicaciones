@@ -33,9 +33,10 @@ la materializa en dos entregables complementarios:
 
 | Página | Descripción | Acceso |
 |---|---|---|
-| [`index.html`](index.html) | Portal público: organización, planes y resumen de controles. | Público |
+| [`index.html`](index.html) | Portal público: organización, planes, controles y resumen del análisis GRC. | Público |
 | [`login.html`](login.html) | Autenticación con hash SHA-256 + salt, token CSRF y bloqueo por intentos. | Público |
 | [`dashboard.html`](dashboard.html) | Panel de usuario y bitácora de seguridad según el rol. | Requiere sesión |
+| [`gobierno.html`](gobierno.html) | Tablero de gobierno: KPI, matrices de activos, riesgos y controles, y mapa de calor. | `administrador` y `soporte` |
 | [`admin.html`](admin.html) | Gestión de usuarios, roles y bloqueo de cuentas. | Solo `administrador` |
 
 ### Cómo ejecutarlo
@@ -75,13 +76,31 @@ mensaje de error correspondiente.
 │   ├── css/styles.css     Sistema de diseño del portal
 │   └── js/
 │       ├── db.js          Base de datos ficticia (usuarios, roles, planes)
-│       └── auth.js        Módulo de autenticación y controles de seguridad
+│       ├── auth.js        Módulo de autenticación y controles de seguridad
+│       └── grc.js         Matrices de activos, riesgos y controles como datos
+├── tools/
+│   └── validar-matrices.js  Comprueba la coherencia interna de las matrices
 ├── index.html             Portal público
 ├── login.html             Inicio de sesión
 ├── dashboard.html         Panel de usuario
+├── gobierno.html          Tablero de gobierno, riesgo y cumplimiento
 ├── admin.html             Gestión de usuarios y roles
 └── SECURITY.md            Decisiones de seguridad del portal
 ```
+
+### Validar las matrices
+
+Las matrices viven dos veces: como documento en `docs/` y como datos en
+`assets/js/grc.js`, que es lo que el portal renderiza. Para que no se
+contradigan, un script comprueba la coherencia interna de los datos:
+
+```bash
+node tools/validar-matrices.js
+```
+
+Verifica que el nivel declarado de cada riesgo corresponda a la matriz de
+calor, que las referencias entre activos, riesgos y controles existan en ambos
+sentidos, y que la criticidad de cada activo sea el máximo de C, I y D.
 
 ## Integrantes
 
