@@ -12,7 +12,7 @@
  */
 const PERRONI_AUTH = (() => {
   const SESSION_KEY = "perroni_session";
-
+ 
   function escapeHTML(str) {
     return String(str)
       .replaceAll("&", "&amp;")
@@ -21,11 +21,11 @@ const PERRONI_AUTH = (() => {
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
   }
-
+ 
   function validarFormatoCorreo(correo) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo);
   }
-
+ 
   function fuerzaPassword(pw) {
     let puntos = 0;
     if (pw.length >= 8) puntos++;
@@ -34,11 +34,11 @@ const PERRONI_AUTH = (() => {
     if (/[^A-Za-z0-9]/.test(pw)) puntos++;
     return puntos;
   }
-
+ 
   function guardarSesion(token, expira, usuario) {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token, expira, usuario }));
   }
-
+ 
   function obtenerSesion() {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
@@ -54,11 +54,11 @@ const PERRONI_AUTH = (() => {
       return null;
     }
   }
-
+ 
   function cerrarSesion() {
     sessionStorage.removeItem(SESSION_KEY);
   }
-
+ 
   async function iniciarSesion(correo, password) {
     if (!validarFormatoCorreo(correo)) {
       return { ok: false, mensaje: "Ingresa un correo institucional válido." };
@@ -71,7 +71,7 @@ const PERRONI_AUTH = (() => {
       return { ok: false, mensaje: err.message || "No se pudo iniciar sesión." };
     }
   }
-
+ 
   // Protege una página: exige sesión vigente y, opcionalmente, un rol permitido
   // (esto solo mejora la experiencia de UI; la API vuelve a validar todo).
   function requerirSesion(rolesPermitidos = null) {
@@ -86,16 +86,16 @@ const PERRONI_AUTH = (() => {
     }
     return sesion;
   }
-
+ 
   function tienePermiso(rol, permiso) {
     const mapa = {
-      administrador: ["ver_dashboard", "gestionar_usuarios", "ver_bitacora", "editar_roles"],
-      soporte: ["ver_dashboard", "ver_bitacora"],
+      administrador: ["ver_dashboard", "gestionar_usuarios", "ver_bitacora", "editar_roles", "ver_grc"],
+      soporte: ["ver_dashboard", "ver_bitacora", "ver_grc"],
       cliente: ["ver_dashboard"],
     };
     return (mapa[rol] || []).includes(permiso);
   }
-
+ 
   return {
     escapeHTML,
     fuerzaPassword,

@@ -276,7 +276,7 @@ thead th {
 tbody td { padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink); vertical-align: middle; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: rgba(237,239,247,0.02); }
-.cell-id { font-family: var(--f-mono); color: var(--ink-faint); font-size: 0.8rem; }
+.cell-id { font-family: var(--f-mono); color: var(--ink-faint); font-size: 0.8rem; white-space: nowrap; }
 
 .badge {
   display: inline-flex; align-items: center; font-family: var(--f-mono); font-size: 0.72rem;
@@ -313,4 +313,100 @@ tbody tr:hover { background: rgba(237,239,247,0.02); }
   .app-shell { grid-template-columns: 1fr; }
   .app-sidebar { display: none; }
   .app-main { padding: 24px 18px; }
+}
+
+/* ---------- Gobierno, riesgo y cumplimiento (GRC) ---------- */
+
+/* Niveles de criticidad / riesgo. Se componen sobre .badge */
+.badge.critico { background: var(--danger); color: #2a0808; }
+.badge.alto { background: var(--danger-soft); color: #ff9d9d; }
+.badge.medio { background: var(--alert-soft); color: var(--alert); }
+.badge.bajo { background: var(--signal-soft); color: var(--signal); }
+
+.tag {
+  display: inline-block; font-family: var(--f-mono); font-size: 0.72rem;
+  background: var(--bg-elevated); border: 1px solid var(--line-strong);
+  color: var(--ink-dim); padding: 2px 7px; border-radius: 5px; margin-right: 4px;
+}
+.tag.link { color: var(--signal); border-color: rgba(0,230,195,0.3); }
+
+/* Los hijos de un grid nacen con min-width:auto, asi que un contenido ancho
+   (una tabla) ensancha su columna y desborda la pagina. min-width:0 los deja
+   encogerse para que el desbordamiento se resuelva dentro del contenedor. */
+.grid-2 > *, .grid-3 > * { min-width: 0; }
+
+/* Tablas anchas: se desplazan dentro de su panel, nunca desbordan la pagina */
+.table-scroll { overflow-x: auto; }
+.table-scroll table { min-width: 640px; }
+/* Tablas de pocas columnas: caben sin desplazamiento */
+.table-scroll.narrow table { min-width: 0; }
+
+/* Matriz de calor probabilidad x impacto */
+.heat {
+  display: grid;
+  grid-template-columns: 92px repeat(4, 1fr);
+  gap: 6px;
+  min-width: 520px;
+}
+.heat-axis {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--ink-faint); font-weight: 600; padding: 6px;
+}
+.heat-axis.row { justify-content: flex-end; text-align: right; }
+.heat-cell {
+  border-radius: 8px; padding: 12px 10px; min-height: 76px;
+  border: 1px solid var(--line); display: flex; flex-direction: column;
+  justify-content: space-between; gap: 8px;
+}
+.heat-cell .lvl {
+  font-family: var(--f-mono); font-size: 0.68rem;
+  text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75;
+}
+.heat-cell.critico { background: rgba(255,93,93,0.28); border-color: rgba(255,93,93,0.5); color: #ffd0d0; }
+.heat-cell.alto { background: var(--danger-soft); border-color: rgba(255,93,93,0.28); color: #ff9d9d; }
+.heat-cell.medio { background: var(--alert-soft); border-color: rgba(255,176,32,0.28); color: var(--alert); }
+.heat-cell.bajo { background: var(--signal-soft); border-color: rgba(0,230,195,0.24); color: var(--signal); }
+
+.heat-chip {
+  display: inline-block; font-family: var(--f-mono); font-size: 0.74rem; font-weight: 700;
+  background: var(--bg); color: var(--ink); border: 1px solid currentColor;
+  padding: 3px 8px; border-radius: 6px;
+}
+
+.heat-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; font-size: 0.78rem; color: var(--ink-faint); }
+.heat-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.heat-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; border: 1px solid var(--line-strong); }
+.heat-legend i.critico { background: rgba(255,93,93,0.28); border-color: rgba(255,93,93,0.5); }
+.heat-legend i.alto { background: var(--danger-soft); border-color: rgba(255,93,93,0.28); }
+.heat-legend i.medio { background: var(--alert-soft); border-color: rgba(255,176,32,0.28); }
+.heat-legend i.bajo { background: var(--signal-soft); border-color: rgba(0,230,195,0.24); }
+
+/* Tarjetas de indicadores (KPI) */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.kpi {
+  background: var(--bg-elevated); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px;
+}
+.kpi .kpi-name { font-size: 0.78rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+.kpi .kpi-val { font-family: var(--f-display); font-size: 1.6rem; font-weight: 600; margin: 8px 0 4px; }
+.kpi .kpi-meta { font-size: 0.76rem; color: var(--ink-dim); font-family: var(--f-mono); }
+.kpi.ok .kpi-val { color: var(--signal); }
+.kpi.warn .kpi-val { color: var(--alert); }
+.kpi.danger .kpi-val { color: var(--danger); }
+
+/* Ficha desplegable de detalle */
+.detalle { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 14px; }
+.detalle summary {
+  cursor: pointer; font-size: 0.86rem; font-weight: 600; color: var(--ink-dim); list-style: none;
+}
+.detalle summary::-webkit-details-marker { display: none; }
+.detalle summary::before { content: "+ "; color: var(--signal); font-family: var(--f-mono); }
+.detalle[open] summary::before { content: "− "; }
+.detalle summary:hover { color: var(--signal); }
+.detalle .detalle-body { margin-top: 12px; font-size: 0.88rem; color: var(--ink-dim); }
+
+@media (max-width: 900px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .heat-wrap { overflow-x: auto; }
 }
