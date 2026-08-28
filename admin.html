@@ -116,7 +116,7 @@
       Object.entries(PERRONI_DB.permisos).map(([rol, permisos]) => `
         <tr>
           <td><span class="role-pill ${esc(rol)}">${esc(rol)}</span></td>
-          <td class="mono" style="color:var(--ink-dim); font-size:0.82rem;">${permisos.map(esc).join(" · ")}</td>
+          <td class="mono" style="color:var(--ink-2); font-size:0.82rem;">${permisos.map(esc).join(" · ")}</td>
         </tr>`).join("");
   }
 </script>
