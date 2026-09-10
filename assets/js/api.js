@@ -1,11 +1,11 @@
 /**
- * PerroniPhone — Cliente de la API (backend ASP.NET Core + SQL Server)
+ * PerroniPhone — Cliente de la API (backend Laravel + MySQL, vía Docker)
  * ----------------------------------------------------------------
- * Cambia API_BASE si tu API corre en otro puerto/URL. El puerto por
- * defecto en Properties/launchSettings.json es http://localhost:5205.
- * Verifica el puerto real en la consola cuando ejecutes `dotnet run`.
+ * La API ahora corre detrás de nginx (contenedor Docker), expuesta en
+ * el puerto 8080 de tu máquina. Si cambian el puerto en docker-compose.yml
+ * (la línea "8080:80" del servicio nginx), actualiza también esta constante.
  */
-const API_BASE = "http://localhost:5205/api";
+const API_BASE = "http://localhost:8080/api";
 
 const PERRONI_API = (() => {
   async function manejarRespuesta(resp) {
