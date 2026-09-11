@@ -1,106 +1,173 @@
-# PerroniPhone — Proyecto de Ciberseguridad
+# PerroniPhone — Portal corporativo académico
 
-Proyecto de la materia de **Ciberseguridad** de la Universidad Autónoma de
-Aguascalientes. Analiza la postura de seguridad de **PerroniPhone
-Comunicaciones**, una empresa **ficticia** del sector de telecomunicaciones, y
-la materializa en dos entregables complementarios:
+Portal corporativo de **PerroniPhone Comunicaciones**, una compañía de
+telecomunicaciones **100% ficticia**, creado como proyecto académico de
+ciberseguridad y gobierno de TI. Todos los datos, usuarios, correos y
+empresas mencionados son simulados con fines educativos.
 
-1. **La documentación de gobierno, riesgo y cumplimiento (GRC)** — el análisis
-   escrito: contexto, gobierno de TI, alineación estratégica y las matrices de
-   activos, riesgos y controles.
-2. **El portal corporativo** — un sitio estático (HTML + CSS + JavaScript) que
-   implementa los controles de seguridad descritos en la documentación:
-   autenticación con hash, control de acceso por rol, bloqueo por intentos y
-   bitácora de auditoría.
+---
 
-> **Aviso**: la empresa, los usuarios, los correos, las contraseñas y todos los
-> datos de este repositorio son ficticios y existen únicamente con fines
-> educativos. No hay backend ni datos reales detrás del portal.
+## ¿Qué incluye el proyecto?
 
-## Documentación del proyecto
+- **Portal público** con información institucional, catálogo de planes y
+  un resumen de gobierno, riesgo y cumplimiento (GRC).
+- **Autenticación** con inicio de sesión, roles y permisos.
+- **Panel de usuario (dashboard)** con datos de cuenta y bitácora de
+  seguridad, según el rol.
+- **Gestión de usuarios y roles** (solo administradores).
+- **Sección de Gobierno de TI**: matrices de activos, riesgos y controles,
+  y su marco regulatorio.
+- **Backend real** en **Laravel**, respaldado por **MySQL**, corriendo en
+  contenedores **Docker** detrás de **Nginx** — autenticación JWT, hashing
+  de contraseñas con PBKDF2 y control de acceso por rol aplicado también
+  del lado del servidor.
+- **Documentación de seguridad** explicando cada decisión de diseño y sus
+  límites.
 
-| # | Documento | Contenido |
-|---|---|---|
-| 1 | [Contexto del proyecto](docs/01-contexto.md) | Información general de la organización, contexto tecnológico y alcance del análisis. |
-| 2 | [Gobierno de TI](docs/02-gobierno-ti.md) | Principios rectores, marco regulatorio (IFT, INAI, PROFECO, SEDECYT), comités de decisión, gestión de riesgos y KPI de auditoría. |
-| 3 | [Alineación estratégica](docs/03-alineacion-estrategica.md) | Cómo cada iniciativa de TI sostiene los procesos de facturación y soporte técnico. |
-| 4 | [Matriz de activos](docs/04-matriz-activos.md) | Inventario A-01 a A-04 con tipo, criticidad y responsable. |
-| 5 | [Matriz de riesgos](docs/05-matriz-riesgos.md) | Riesgos R-01 a R-03 con amenaza, vulnerabilidad, probabilidad, impacto y nivel. |
-| 6 | [Matriz de controles](docs/06-matriz-controles.md) | Controles C-01 a C-0n, su tipo y el riesgo que mitigan. |
-| — | [Decisiones de seguridad del portal](SECURITY.md) | Qué control implementa el código del portal, por qué y cuáles son sus límites. |
+> **Nota sobre versiones:** este proyecto tuvo una primera versión del
+> backend en ASP.NET Core + SQL Server (documentada en
+> `backend-dotnet-legacy/` si la conservaron, o en el historial de Git).
+> La versión vigente, descrita en este README, es la de **Docker + Nginx +
+> Laravel + MySQL**, migrada para cumplir con la arquitectura definida en
+> la propuesta del proyecto.
 
-## El portal
+---
 
-| Página | Descripción | Acceso |
-|---|---|---|
-| [`index.html`](index.html) | Portal público: organización, planes, controles y resumen del análisis GRC. | Público |
-| [`login.html`](login.html) | Autenticación con hash SHA-256 + salt, token CSRF y bloqueo por intentos. | Público |
-| [`dashboard.html`](dashboard.html) | Panel de usuario y bitácora de seguridad según el rol. | Requiere sesión |
-| [`gobierno.html`](gobierno.html) | Tablero de gobierno: KPI, matrices de activos, riesgos y controles, y mapa de calor. | `administrador` y `soporte` |
-| [`admin.html`](admin.html) | Gestión de usuarios, roles y bloqueo de cuentas. | Solo `administrador` |
-
-### Cómo ejecutarlo
-
-El portal es estático y no requiere instalación. Basta con abrir `index.html`
-en el navegador. Para que el módulo de autenticación funcione con la Web Crypto
-API conviene servirlo por HTTP en lugar de abrirlo como archivo local:
-
-```bash
-# Con Python (cualquier sistema)
-python -m http.server 8080
-
-# Con Node.js
-npx serve .
-```
-
-Después, abrir <http://localhost:8080>.
-
-### Cuentas de demostración
-
-| Correo | Contraseña | Rol | Estado |
-|---|---|---|---|
-| `admin@perroniphone.edu.mx` | `Admin#2026` | administrador | activo |
-| `soporte@perroniphone.edu.mx` | `Soporte#2026` | soporte | activo |
-| `cliente@perroniphone.edu.mx` | `Cliente#2026` | cliente | activo |
-| `emilio.farias@perroniphone.edu.mx` | `Cliente#2026` | cliente | bloqueado |
-
-La última cuenta existe a propósito para demostrar el estado "bloqueado" y el
-mensaje de error correspondiente.
-
-## Estructura del repositorio
+## Estructura del proyecto
 
 ```
-.
-├── docs/                  Documentación GRC del proyecto
+perroniphone/
+├── index.html              # Portal público (organización, planes, seguridad, gobierno)
+├── login.html               # Formulario de acceso
+├── dashboard.html            # Panel de usuario autenticado
+├── admin.html                # Gestión de usuarios y roles (solo administrador)
+├── gobierno.html             # Detalle de gobierno de TI / GRC
+├── security.html             # Documentación de seguridad (versión web)
+├── SECURITY.md                # Documentación de seguridad (versión Markdown)
+├── MIGRACION-LARAVEL.md       # Guía detallada de la migración a Docker/Laravel/MySQL
+├── docker-compose.yml         # Orquesta los 4 contenedores
+├── Dockerfile                 # Imagen del contenedor "app" (Laravel)
+├── .gitignore
+│
 ├── assets/
-│   ├── css/styles.css     Sistema de diseño del portal
+│   ├── css/
+│   │   └── styles.css        # Sistema de diseño del portal
 │   └── js/
-│       ├── db.js          Base de datos ficticia (usuarios, roles, planes)
-│       ├── auth.js        Módulo de autenticación y controles de seguridad
-│       └── grc.js         Matrices de activos, riesgos y controles como datos
-├── tools/
-│   └── validar-matrices.js  Comprueba la coherencia interna de las matrices
-├── index.html             Portal público
-├── login.html             Inicio de sesión
-├── dashboard.html         Panel de usuario
-├── gobierno.html          Tablero de gobierno, riesgo y cumplimiento
-├── admin.html             Gestión de usuarios y roles
-└── SECURITY.md            Decisiones de seguridad del portal
+│       ├── api.js             # Cliente HTTP hacia la API (fetch) — apunta a http://localhost:8080/api
+│       ├── auth.js            # Sesión, permisos por rol, utilidades de seguridad
+│       └── grc.js             # Datos de activos/riesgos/controles (gobierno de TI)
+│
+├── docs/                      # Análisis de gobierno, riesgo y cumplimiento
+│   ├── 02-gobierno-ti.md
+│   ├── 04-matriz-activos.md
+│   ├── 05-matriz-riesgos.md
+│   └── 06-matriz-controles.md
+│
+├── docker/
+│   ├── entrypoint.sh           # Prepara .env, corre migraciones/seeders al arrancar
+│   └── nginx/default.conf      # Config de nginx (proxy hacia PHP-FPM)
+│
+└── laravel-app/                # Código de la aplicación Laravel
+    ├── app/Http/Controllers/Api/   # AuthController, UsuariosController, BitacoraController, PlanesController
+    ├── app/Http/Middleware/EnsureRole.php
+    ├── app/Models/                  # Usuario, Plan, Bitacora, Permiso
+    ├── app/Services/PasswordHasher.php   # PBKDF2 (mismo algoritmo que la v1)
+    ├── bootstrap/app.php
+    ├── config/ (auth.php, cors.php)
+    ├── database/migrations/         # Esquema (usuarios, permisos, planes, bitacora)
+    ├── database/seeders/DatabaseSeeder.php   # Datos ficticios (idempotente)
+    ├── routes/api.php
+    └── .env.example
 ```
 
-### Validar las matrices
+**Nota:** el esqueleto completo de Laravel (`vendor/`, `artisan`,
+`public/index.php`, etc.) no vive en el repositorio — se genera solo la
+primera vez que se construye la imagen de Docker (`docker compose build`),
+porque requiere descargar el framework desde internet.
 
-Las matrices viven dos veces: como documento en `docs/` y como datos en
-`assets/js/grc.js`, que es lo que el portal renderiza. Para que no se
-contradigan, un script comprueba la coherencia interna de los datos:
+---
+
+## Arquitectura
+
+```
+Navegador (HTML/CSS/JS)  →  Nginx (:8080)  →  Laravel/PHP-FPM  →  MySQL
+                                                                  ↑
+                                             phpMyAdmin (:8081) ─┘
+```
+
+El frontend es completamente estático y se comunica con el backend
+mediante `fetch` (ver `assets/js/api.js`). El backend expone endpoints
+REST protegidos con JWT y control de acceso por rol
+(middleware `EnsureRole`), y persiste todos los datos en MySQL.
+
+Los 4 contenedores (`nginx`, `app`, `mysql`, `phpmyadmin`) se levantan
+juntos con Docker Compose.
+
+---
+
+## Cómo correrlo
+
+Instrucciones completas, comandos y solución de problemas comunes en
+[`MIGRACION-LARAVEL.md`](MIGRACION-LARAVEL.md). En resumen:
 
 ```bash
-node tools/validar-matrices.js
+docker compose build     # solo la primera vez (o si cambia el Dockerfile)
+docker compose up -d
 ```
 
-Verifica que el nivel declarado de cada riesgo corresponda a la matriz de
-calor, que las referencias entre activos, riesgos y controles existan en ambos
-sentidos, y que la criticidad de cada activo sea el máximo de C, I y D.
+Luego abre `index.html` con **Live Server** en VS Code (no con doble
+clic — el navegador bloquea las peticiones hacia la API desde `file://`).
+
+---
+
+## Cuentas del equipo
+
+| Correo | Contraseña | Rol |
+|---|---|---|
+| rafa@perroniphone.edu.mx | Rafa#2026 | administrador |
+| simon@perroniphone.edu.mx | Simon#2026 | administrador |
+| joshua@perroniphone.edu.mx | Joshua#2026 | soporte |
+| carlos@perroniphone.edu.mx | Carlos#2026 | cliente |
+| ivan@perroniphone.edu.mx | Ivan#2026 | cliente (cuenta bloqueada) |
+
+---
+
+## Verificar la base de datos
+
+Entra a **phpMyAdmin** en `http://localhost:8081` (usuario
+`perroniphone_user` / `perroniphone_pass`, o `root` /
+`perroniphone_root_pass` para ver todo). Deben aparecer las tablas
+`usuarios`, `planes`, `bitacora` y `permisos` ya con los datos ficticios
+cargados.
+
+---
+
+## Seguridad
+
+El detalle completo de cada decisión de seguridad (hashing de contraseñas,
+JWT, control de acceso por rol, bloqueo por intentos fallidos, protección
+contra inyección SQL, etc.) está documentado en:
+
+- [`security.html`](security.html) — versión navegable dentro del sitio
+- [`SECURITY.md`](SECURITY.md) — versión Markdown
+
+---
+
+## Gobierno de TI (GRC)
+
+La sección de Gobierno del portal (`#gobierno` en la página de inicio, y
+`gobierno.html` para el detalle) presenta el análisis de activos, riesgos
+y controles de la organización ficticia, junto con su marco regulatorio
+(IFT, INAI, PROFECO, SEDECYT). El análisis completo está en la carpeta
+[`docs/`](docs/).
+
+---
+
+## Aviso
+
+Este es un proyecto académico. La compañía, los usuarios, las
+contraseñas, los riesgos y cualquier otro dato mostrado son **completamente
+ficticios** y se usan únicamente con fines de aprendizaje.
 
 ## Integrantes
 
