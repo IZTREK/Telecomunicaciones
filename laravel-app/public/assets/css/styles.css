@@ -410,3 +410,8 @@ tbody tr:hover { background: rgba(237,239,247,0.02); }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .heat-wrap { overflow-x: auto; }
 }
+
+/* Nuevos roles del equipo: redes, encargado, contabilidad */
+.role-pill.redes { background: var(--alert-soft); color: var(--alert); }
+.role-pill.encargado { background: var(--bg-elevated-2); color: var(--ink); }
+.role-pill.contabilidad { background: var(--signal-soft); color: var(--signal); }

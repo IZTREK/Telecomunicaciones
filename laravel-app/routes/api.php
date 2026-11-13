@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BitacoraController;
+use App\Http\Controllers\Api\ContabilidadController;
 use App\Http\Controllers\Api\PlanesController;
 use App\Http\Controllers\Api\UsuariosController;
 use App\Http\Middleware\EnsureRole;
@@ -26,5 +27,10 @@ Route::middleware('auth:api')->group(function () {
     // Administrador y soporte.
     Route::middleware(EnsureRole::class . ':administrador,soporte')->group(function () {
         Route::get('/bitacora', [BitacoraController::class, 'index']);
+    });
+
+    // Administrador, encargado y contabilidad.
+    Route::middleware(EnsureRole::class . ':administrador,encargado,contabilidad')->group(function () {
+        Route::get('/contabilidad', [ContabilidadController::class, 'index']);
     });
 });

@@ -16,6 +16,7 @@
       <a href="dashboard.html"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="10" width="3.4" height="7.5" rx="1"/><rect x="8.3" y="5.5" width="3.4" height="12" rx="1"/><rect x="14.1" y="2.5" width="3.4" height="15" rx="1"/></svg> Panel</a>
       <a href="gobierno.html" id="link-grc"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M10 2.2 16.5 5v5.2c0 4-2.7 6.6-6.5 7.6-3.8-1-6.5-3.6-6.5-7.6V5z" fill="none" stroke-width="1.6"/><path d="M7.2 10.2l2 2 3.6-4" fill="none" stroke-width="1.6"/></svg> Gobierno y riesgos</a>
       <a href="admin.html" class="active"><svg class="nav-ic" viewBox="0 0 20 20"><circle cx="7" cy="6.5" r="3"/><path d="M1.5 17c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5" fill="none" stroke-width="1.6"/><circle cx="15" cy="7.5" r="2.4" fill="none" stroke-width="1.6"/><path d="M12.7 17c.2-2.6 1.9-4.4 4.3-4.4" fill="none" stroke-width="1.6"/></svg> Usuarios y roles</a>
+      <a href="contabilidad.html" id="link-contabilidad"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="15" height="15" rx="2" fill="none" stroke-width="1.6"/><path d="M6 11.5l2.5 2.5L14 8" fill="none" stroke-width="1.6"/></svg> Contabilidad</a>
       <a href="index.html"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M2.5 9.5 10 3l7.5 6.5" fill="none" stroke-width="1.6"/><path d="M4.5 8.5V17h11V8.5" fill="none" stroke-width="1.6"/></svg> Portal público</a>
     </nav>
     <div class="session-card" id="session-card"></div>
@@ -33,7 +34,7 @@
 
     <div class="panel">
       <h2>Directorio de usuarios</h2>
-      <p class="panel-sub">Los cambios se guardan en SQL Server a través de la API — persisten aunque recargues la página.</p>
+      <p class="panel-sub">Los cambios se guardan en MySQL a través de la API — persisten aunque recargues la página.</p>
       <table>
         <thead>
           <tr>
@@ -61,34 +62,47 @@
   const sesion = PERRONI_AUTH.requerirSesion(["administrador"]);
   if (sesion) {
     const esc = PERRONI_AUTH.escapeHTML;
+    const u = sesion.usuario;
+    const rolesDisponibles = PERRONI_AUTH.obtenerRolesDisponibles();
     let usuarios = [];
 
     document.getElementById("session-card").innerHTML = `
-      <div class="who">${esc(sesion.usuario.nombre)}</div>
-      <span class="role-pill ${esc(sesion.usuario.rol)}">${esc(sesion.usuario.rol)}</span>`;
+      <div class="who">${esc(u.nombre)}</div>
+      <span class="role-pill ${esc(u.rol)}">${esc(u.rol)}</span>`;
 
     document.getElementById("btn-logout").addEventListener("click", () => {
       PERRONI_AUTH.cerrarSesion();
       window.location.href = "login.html";
     });
 
+    function bloquearSiNoTienePermiso(idEnlace, permiso) {
+      if (PERRONI_AUTH.tienePermiso(u.rol, permiso)) return;
+      const link = document.getElementById(idEnlace);
+      if (!link) return;
+      link.classList.add("locked");
+      link.removeAttribute("href");
+      link.title = "Tu rol no tiene acceso a esta sección";
+    }
+    bloquearSiNoTienePermiso("link-grc", "ver_grc");
+    bloquearSiNoTienePermiso("link-contabilidad", "ver_contabilidad");
+
     function pintarUsuarios() {
       const tbody = document.getElementById("tabla-usuarios");
-      tbody.innerHTML = usuarios.map((u) => `
+      tbody.innerHTML = usuarios.map((us) => `
         <tr>
-          <td class="cell-id">${esc(u.codigoUsuario)}</td>
-          <td>${esc(u.nombre)}</td>
-          <td>${esc(u.correo)}</td>
+          <td class="cell-id">${esc(us.codigoUsuario)}</td>
+          <td>${esc(us.nombre)}</td>
+          <td>${esc(us.correo)}</td>
           <td>
-            <select class="select-role" data-id="${u.id}" data-accion="rol">
-              ${["cliente", "soporte", "administrador"].map(r =>
-                `<option value="${r}" ${r === u.rol ? "selected" : ""}>${r}</option>`).join("")}
+            <select class="select-role" data-id="${us.id}" data-accion="rol">
+              ${rolesDisponibles.map(r =>
+                `<option value="${r}" ${r === us.rol ? "selected" : ""}>${r}</option>`).join("")}
             </select>
           </td>
-          <td><span class="badge ${esc(u.estado)}">${esc(u.estado)}</span></td>
+          <td><span class="badge ${esc(us.estado)}">${esc(us.estado)}</span></td>
           <td class="row-actions">
-            <button class="icon-btn" data-id="${u.id}" data-accion="estado" data-estado-actual="${esc(u.estado)}">
-              ${u.estado === "activo" ? "Bloquear" : "Desbloquear"}
+            <button class="icon-btn" data-id="${us.id}" data-accion="estado" data-estado-actual="${esc(us.estado)}">
+              ${us.estado === "activo" ? "Bloquear" : "Desbloquear"}
             </button>
           </td>
         </tr>`).join("");
@@ -96,13 +110,13 @@
 
     async function cargarUsuarios() {
       const tbody = document.getElementById("tabla-usuarios");
-      tbody.innerHTML = `<tr><td colspan="6" style="color:var(--ink-faint);">Cargando desde SQL Server…</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="color:var(--ink-faint);">Cargando desde MySQL…</td></tr>`;
       try {
         usuarios = await PERRONI_API.obtenerUsuarios(sesion.token);
         pintarUsuarios();
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="6" style="color:var(--danger);">
-          No se pudo cargar el directorio (¿está corriendo la API en dotnet run?). ${esc(err.message)}
+          No se pudo cargar el directorio (¿está corriendo la API?). ${esc(err.message)}
         </td></tr>`;
       }
     }
@@ -113,7 +127,7 @@
         const id = Number(e.target.dataset.id);
         try {
           await PERRONI_API.actualizarRol(sesion.token, id, e.target.value);
-          await cargarUsuarios(); // se vuelve a leer de la base para reflejar el estado real
+          await cargarUsuarios();
         } catch (err) {
           alert("No se pudo actualizar el rol: " + err.message);
           cargarUsuarios();
@@ -136,13 +150,8 @@
       }
     });
 
-    const permisosPorRol = {
-      administrador: ["ver_dashboard", "gestionar_usuarios", "ver_bitacora", "editar_roles"],
-      soporte: ["ver_dashboard", "ver_bitacora"],
-      cliente: ["ver_dashboard"],
-    };
     document.getElementById("tabla-permisos").innerHTML =
-      Object.entries(permisosPorRol).map(([rol, permisos]) => `
+      Object.entries(PERRONI_AUTH.obtenerMapaPermisos()).map(([rol, permisos]) => `
         <tr>
           <td><span class="role-pill ${esc(rol)}">${esc(rol)}</span></td>
           <td class="mono" style="color:var(--ink-dim); font-size:0.82rem;">${permisos.map(esc).join(" · ")}</td>

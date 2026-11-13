@@ -1,11 +1,18 @@
 /**
  * PerroniPhone — Cliente de la API (backend Laravel + MySQL, vía Docker)
  * ----------------------------------------------------------------
- * La API ahora corre detrás de nginx (contenedor Docker), expuesta en
- * el puerto 8080 de tu máquina. Si cambian el puerto en docker-compose.yml
- * (la línea "8080:80" del servicio nginx), actualiza también esta constante.
+ * Frontend y API ahora se sirven desde el MISMO origen (el mismo nginx,
+ * puerto 8080), así que la URL es relativa: funciona igual en
+ * http://localhost:8080 que detrás de un túnel de ngrok, sin tener que
+ * cambiar nada entre ambiente local y público.
  */
-const API_BASE = "http://localhost:8080/api";
+const API_BASE = "/api";
+
+// El plan gratuito de ngrok muestra una página de advertencia ("¿seguro
+// que quieres visitar este sitio?") antes de dejar pasar la petición.
+// Este header le dice a ngrok que la salte — sin él, cada fetch() a la
+// API recibiría esa página HTML en vez de la respuesta JSON real.
+const HEADERS_NGROK = { "ngrok-skip-browser-warning": "true" };
 
 const PERRONI_API = (() => {
   async function manejarRespuesta(resp) {
@@ -23,14 +30,14 @@ const PERRONI_API = (() => {
 
   function headersAuth(token) {
     return token
-      ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
-      : { "Content-Type": "application/json" };
+      ? { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...HEADERS_NGROK }
+      : { "Content-Type": "application/json", ...HEADERS_NGROK };
   }
 
   async function login(correo, password) {
     const resp = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...HEADERS_NGROK },
       body: JSON.stringify({ correo, password }),
     });
     return manejarRespuesta(resp);
@@ -65,9 +72,17 @@ const PERRONI_API = (() => {
   }
 
   async function obtenerPlanes() {
-    const resp = await fetch(`${API_BASE}/planes`);
+    const resp = await fetch(`${API_BASE}/planes`, { headers: HEADERS_NGROK });
     return manejarRespuesta(resp);
   }
 
-  return { login, obtenerUsuarios, actualizarRol, actualizarEstado, obtenerBitacora, obtenerPlanes };
+  async function obtenerContabilidad(token) {
+    const resp = await fetch(`${API_BASE}/contabilidad`, { headers: headersAuth(token) });
+    return manejarRespuesta(resp);
+  }
+
+  return {
+    login, obtenerUsuarios, actualizarRol, actualizarEstado,
+    obtenerBitacora, obtenerPlanes, obtenerContabilidad,
+  };
 })();

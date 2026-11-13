@@ -2,72 +2,63 @@
 
 namespace App\Models;
 
-use Illuminate\Auth\Authenticatable;
-use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
-class Usuario extends Model implements AuthenticatableContract, JWTSubject
+class Usuario extends Authenticatable implements JWTSubject
 {
-    use Authenticatable;
-
     protected $table = 'usuarios';
+    protected $primaryKey = 'id'; // <-- El nombre real en tu base de datos es 'id'
+    public $incrementing = true;
+    protected $keyType = 'int';
 
-    protected $fillable = [
-        'codigo_usuario', 'nombre', 'correo', 'rol', 'estado',
-        'salt', 'hash_password', 'intentos_fallidos',
-        'bloqueado_hasta', 'ultimo_acceso',
-    ];
-
-    // Nunca se envían al frontend (equivalente a nuestro UsuarioDto en C#,
-    // que a propósito nunca incluía Salt ni HashPassword).
-    protected $hidden = [
-        'salt', 'hash_password',
-    ];
-
-    protected $casts = [
-        'bloqueado_hasta' => 'datetime',
-        'ultimo_acceso' => 'datetime',
-    ];
-
-    // El trait Authenticatable busca por defecto una columna "password";
-    // la nuestra se llama distinto, así que se lo indicamos explícitamente.
-    public function getAuthPassword()
+    public function getKeyName()
     {
-        return $this->hash_password;
+        return 'id';
     }
 
-    /**
-     * Traduce el modelo al mismo formato (camelCase) que el frontend ya
-     * esperaba de la API en ASP.NET Core — así assets/js/api.js y
-     * assets/js/auth.js no necesitaron cambiar nada al migrar el backend.
-     */
-    public function toPublicArray(): array
-    {
-        return [
-            'id' => $this->id,
-            'codigoUsuario' => $this->codigo_usuario,
-            'nombre' => $this->nombre,
-            'correo' => $this->correo,
-            'rol' => $this->rol,
-            'estado' => $this->estado,
-            'ultimoAcceso' => optional($this->ultimo_acceso)->toIso8601String(),
-        ];
-    }
-
-    // --- Requerido por el paquete JWT: qué va en el "sub" del token ---
+    // Requeridos por JWT
     public function getJWTIdentifier()
     {
-        return $this->getKey();
+        return $this->getKey(); // Retornará el id (ej. 3 o el que corresponda en tu tabla)
     }
 
-    // Claims extra dentro del JWT: aquí viaja el rol, igual que en TokenService.cs
     public function getJWTCustomClaims()
     {
         return [
             'codigo' => $this->codigo_usuario,
             'nombre' => $this->nombre,
             'rol' => $this->rol,
+        ];
+    }
+
+    protected $fillable = [
+        'codigo_usuario',
+        'nombre',
+        'correo',
+        'hash_password',
+        'salt',
+        'rol',
+        'estado',
+        'intentos_fallidos',
+        'bloqueado_hasta',
+        'ultimo_acceso',
+    ];
+
+    protected $hidden = [
+        'hash_password',
+        'salt',
+    ];
+
+    public function toPublicArray()
+    {
+        return [
+            'id' => $this->id,
+            'codigo_usuario' => $this->codigo_usuario,
+            'nombre' => $this->nombre,
+            'correo' => $this->correo,
+            'rol' => $this->rol,
+            'estado' => $this->estado,
         ];
     }
 }

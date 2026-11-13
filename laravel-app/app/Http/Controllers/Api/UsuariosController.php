@@ -9,7 +9,9 @@ use Illuminate\Http\Request;
 
 class UsuariosController extends Controller
 {
-    private const ROLES_VALIDOS = ['cliente', 'soporte', 'administrador'];
+    // Debe coincidir con el catálogo de assets/js/auth.js (MAPA_PERMISOS)
+    // y con los permisos sembrados en la migración.
+    private const ROLES_VALIDOS = ['cliente', 'soporte', 'administrador', 'redes', 'encargado', 'contabilidad'];
 
     // Cualquier usuario autenticado puede ver el directorio (se usa en el dashboard).
     public function index()
@@ -66,7 +68,6 @@ class UsuariosController extends Controller
 
         $usuario->estado = $data['estado'];
 
-        // Al reactivar una cuenta también se limpian los contadores de intentos fallidos.
         if ($data['estado'] === 'activo') {
             $usuario->intentos_fallidos = 0;
             $usuario->bloqueado_hasta = null;

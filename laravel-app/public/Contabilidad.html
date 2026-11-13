@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contabilidad — PerroniPhone</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230a0e1c%27/%3E%3Crect x=%276%27 y=%2718%27 width=%274%27 height=%278%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3Crect x=%2713%27 y=%2712%27 width=%274%27 height=%2714%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3Crect x=%2720%27 y=%276%27 width=%274%27 height=%2720%27 rx=%271%27 fill=%27%2300e6c3%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="app-sidebar">
+    <a href="index.html" class="brand"><span class="bars"><i></i><i></i><i></i><i></i></span> PerroniPhone</a>
+    <nav class="app-nav">
+      <a href="dashboard.html"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="10" width="3.4" height="7.5" rx="1"/><rect x="8.3" y="5.5" width="3.4" height="12" rx="1"/><rect x="14.1" y="2.5" width="3.4" height="15" rx="1"/></svg> Panel</a>
+      <a href="gobierno.html" id="link-grc"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M10 2.2 16.5 5v5.2c0 4-2.7 6.6-6.5 7.6-3.8-1-6.5-3.6-6.5-7.6V5z" fill="none" stroke-width="1.6"/><path d="M7.2 10.2l2 2 3.6-4" fill="none" stroke-width="1.6"/></svg> Gobierno y riesgos</a>
+      <a href="contabilidad.html" class="active" id="link-contabilidad"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="15" height="15" rx="2" fill="none" stroke-width="1.6"/><path d="M6 11.5l2.5 2.5L14 8" fill="none" stroke-width="1.6"/></svg> Contabilidad</a>
+      <a href="admin.html" id="link-admin"><svg class="nav-ic" viewBox="0 0 20 20"><circle cx="7" cy="6.5" r="3"/><path d="M1.5 17c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5" fill="none" stroke-width="1.6"/><circle cx="15" cy="7.5" r="2.4" fill="none" stroke-width="1.6"/><path d="M12.7 17c.2-2.6 1.9-4.4 4.3-4.4" fill="none" stroke-width="1.6"/></svg> Usuarios y roles</a>
+      <a href="index.html"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M2.5 9.5 10 3l7.5 6.5" fill="none" stroke-width="1.6"/><path d="M4.5 8.5V17h11V8.5" fill="none" stroke-width="1.6"/></svg> Portal público</a>
+    </nav>
+    <div class="session-card" id="session-card"></div>
+    <button class="btn btn-ghost btn-block" id="btn-logout" style="margin-top:14px;">Cerrar sesión</button>
+  </aside>
+
+  <main class="app-main">
+    <div class="app-header">
+      <div>
+        <h1>Contabilidad</h1>
+        <p>Resumen financiero de referencia — datos 100% ficticios, solo de demostración.</p>
+      </div>
+      <span class="badge activo">Acceso restringido</span>
+    </div>
+
+    <div class="grid-3" id="resumen-financiero">
+      <div class="card"><span class="idx">Cargando…</span></div>
+    </div>
+
+    <div class="panel">
+      <h2>Movimientos</h2>
+      <p class="panel-sub">Ingresos y gastos registrados (datos ficticios).</p>
+      <table>
+        <thead>
+          <tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Tipo</th><th>Monto</th></tr>
+        </thead>
+        <tbody id="tabla-movimientos">
+          <tr><td colspan="5" style="color:var(--ink-faint);">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Acerca de esta sección</h2>
+      <p class="panel-sub">Nota académica</p>
+      <p style="color:var(--ink-dim); font-size:0.9rem;">
+        Esta pantalla es un ejemplo de información sensible dentro del
+        portal: solo los roles <code>administrador</code>,
+        <code>encargado</code> y <code>contabilidad</code> pueden verla.
+        El control de acceso se aplica tanto en el frontend (oculta el
+        enlace) como en el backend (el endpoint <code>/api/contabilidad</code>
+        rechaza a cualquier otro rol con un 403).
+      </p>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script>
+  const sesion = PERRONI_AUTH.requerirSesion(["administrador", "encargado", "contabilidad"]);
+  if (sesion) {
+    const esc = PERRONI_AUTH.escapeHTML;
+    const u = sesion.usuario;
+
+    document.getElementById("session-card").innerHTML = `
+      <div class="who">${esc(u.nombre)}</div>
+      <span class="role-pill ${esc(u.rol)}">${esc(u.rol)}</span>`;
+
+    // Oculta/bloquea los enlaces que este rol no tiene permitido abrir.
+    function bloquearSiNoTienePermiso(idEnlace, permiso) {
+      if (PERRONI_AUTH.tienePermiso(u.rol, permiso)) return;
+      const link = document.getElementById(idEnlace);
+      if (!link) return;
+      link.classList.add("locked");
+      link.removeAttribute("href");
+      link.title = "Tu rol no tiene acceso a esta sección";
+    }
+    bloquearSiNoTienePermiso("link-grc", "ver_grc");
+    bloquearSiNoTienePermiso("link-admin", "gestionar_usuarios");
+
+    document.getElementById("btn-logout").addEventListener("click", () => {
+      PERRONI_AUTH.cerrarSesion();
+      window.location.href = "login.html";
+    });
+
+    const fmt = (n) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+
+    PERRONI_API.obtenerContabilidad(sesion.token)
+      .then(({ resumen, movimientos }) => {
+        document.getElementById("resumen-financiero").innerHTML = `
+          <div class="card">
+            <span class="idx">Ingresos</span>
+            <div class="stat-row"><div class="stat"><b style="color:var(--signal);">${fmt(resumen.totalIngresos)}</b><span>Total ficticio</span></div></div>
+          </div>
+          <div class="card">
+            <span class="idx">Gastos</span>
+            <div class="stat-row"><div class="stat"><b style="color:var(--danger);">${fmt(resumen.totalGastos)}</b><span>Total ficticio</span></div></div>
+          </div>
+          <div class="card">
+            <span class="idx">Balance</span>
+            <div class="stat-row"><div class="stat"><b>${fmt(resumen.balance)}</b><span>Ingresos − Gastos</span></div></div>
+          </div>`;
+
+        document.getElementById("tabla-movimientos").innerHTML = movimientos.map((m) => `
+          <tr>
+            <td class="mono" style="font-size:0.82rem;">${esc(m.fecha)}</td>
+            <td>${esc(m.concepto)}</td>
+            <td style="color:var(--ink-dim);">${esc(m.categoria ?? "—")}</td>
+            <td><span class="badge ${m.tipo === "ingreso" ? "activo" : "bloqueado"}">${esc(m.tipo)}</span></td>
+            <td class="mono">${m.tipo === "gasto" ? "−" : "+"}${fmt(m.monto)}</td>
+          </tr>`).join("");
+      })
+      .catch((err) => {
+        document.getElementById("resumen-financiero").innerHTML = "";
+        document.getElementById("tabla-movimientos").innerHTML =
+          `<tr><td colspan="5" style="color:var(--danger);">No se pudo cargar la información (${esc(err.message)}).</td></tr>`;
+      });
+  }
+</script>
+</body>
+</html>

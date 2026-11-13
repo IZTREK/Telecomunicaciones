@@ -1,18 +1,26 @@
 /**
  * PerroniPhone — Sesión del lado del cliente (versión con backend real)
  * ------------------------------------------------------------------
- * A diferencia de la versión sin servidor, aquí:
- *  - La contraseña se envía al backend y se verifica ahí (PBKDF2).
- *  - El token de sesión es un JWT FIRMADO por el servidor: el cliente
- *    ya no puede alterar su rol o id sin invalidar la firma.
- *  - El control de acceso real ocurre en cada endpoint de la API
- *    ([Authorize(Roles=...)]); lo que hace este archivo en el
- *    navegador es solo para mostrar/ocultar UI, nunca es la barrera
- *    de seguridad real.
+ * El token de sesión es un JWT FIRMADO por el servidor; el control de
+ * acceso real ocurre en cada endpoint de la API (EnsureRole), lo que
+ * hace este archivo en el navegador es solo para mostrar/ocultar UI.
  */
 const PERRONI_AUTH = (() => {
   const SESSION_KEY = "perroni_session";
- 
+
+  // Catálogo central de roles y permisos: ÚNICA fuente de verdad en el
+  // frontend. admin.html y gobierno.html lo consultan en vez de tener
+  // cada uno su propia copia (que es justo como se desincronizó antes).
+  // Debe reflejar lo mismo que hay en la tabla "permisos" del backend.
+  const MAPA_PERMISOS = {
+    administrador: ["ver_dashboard", "gestionar_usuarios", "ver_bitacora", "editar_roles", "ver_grc", "ver_contabilidad"],
+    soporte: ["ver_dashboard", "ver_bitacora"],
+    redes: ["ver_dashboard", "ver_grc"],
+    encargado: ["ver_dashboard", "ver_contabilidad","gestionar_usuarios","ver_grc"],
+    contabilidad: ["ver_dashboard", "ver_contabilidad"],
+    cliente: ["ver_dashboard"],
+  };
+
   function escapeHTML(str) {
     return String(str)
       .replaceAll("&", "&amp;")
@@ -21,11 +29,11 @@ const PERRONI_AUTH = (() => {
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
   }
- 
+
   function validarFormatoCorreo(correo) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo);
   }
- 
+
   function fuerzaPassword(pw) {
     let puntos = 0;
     if (pw.length >= 8) puntos++;
@@ -34,11 +42,11 @@ const PERRONI_AUTH = (() => {
     if (/[^A-Za-z0-9]/.test(pw)) puntos++;
     return puntos;
   }
- 
+
   function guardarSesion(token, expira, usuario) {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token, expira, usuario }));
   }
- 
+
   function obtenerSesion() {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
@@ -54,11 +62,11 @@ const PERRONI_AUTH = (() => {
       return null;
     }
   }
- 
+
   function cerrarSesion() {
     sessionStorage.removeItem(SESSION_KEY);
   }
- 
+
   async function iniciarSesion(correo, password) {
     if (!validarFormatoCorreo(correo)) {
       return { ok: false, mensaje: "Ingresa un correo institucional válido." };
@@ -71,9 +79,7 @@ const PERRONI_AUTH = (() => {
       return { ok: false, mensaje: err.message || "No se pudo iniciar sesión." };
     }
   }
- 
-  // Protege una página: exige sesión vigente y, opcionalmente, un rol permitido
-  // (esto solo mejora la experiencia de UI; la API vuelve a validar todo).
+
   function requerirSesion(rolesPermitidos = null) {
     const sesion = obtenerSesion();
     if (!sesion) {
@@ -86,16 +92,27 @@ const PERRONI_AUTH = (() => {
     }
     return sesion;
   }
- 
+
   function tienePermiso(rol, permiso) {
-    const mapa = {
-      administrador: ["ver_dashboard", "gestionar_usuarios", "ver_bitacora", "editar_roles", "ver_grc"],
-      soporte: ["ver_dashboard", "ver_bitacora", "ver_grc"],
-      cliente: ["ver_dashboard"],
-    };
-    return (mapa[rol] || []).includes(permiso);
+    return (MAPA_PERMISOS[rol] || []).includes(permiso);
   }
- 
+
+  // Qué roles tienen cierto permiso (ej. "¿quién puede ver Gobierno/GRC?").
+  // Se deriva del catálogo en vez de escribirse a mano en cada página.
+  function rolesConPermiso(permiso) {
+    return Object.entries(MAPA_PERMISOS)
+      .filter(([, permisos]) => permisos.includes(permiso))
+      .map(([rol]) => rol);
+  }
+
+  function obtenerRolesDisponibles() {
+    return Object.keys(MAPA_PERMISOS);
+  }
+
+  function obtenerMapaPermisos() {
+    return Object.fromEntries(Object.entries(MAPA_PERMISOS).map(([r, p]) => [r, [...p]]));
+  }
+
   return {
     escapeHTML,
     fuerzaPassword,
@@ -105,5 +122,8 @@ const PERRONI_AUTH = (() => {
     cerrarSesion,
     requerirSesion,
     tienePermiso,
+    rolesConPermiso,
+    obtenerRolesDisponibles,
+    obtenerMapaPermisos,
   };
 })();

@@ -27,6 +27,7 @@ RUN composer require php-open-source-saver/jwt-auth --no-interaction
 COPY laravel-app/app/ ./app/
 COPY laravel-app/routes/ ./routes/
 COPY laravel-app/database/ ./database/
+COPY laravel-app/public/ /var/www/public/
 COPY laravel-app/config/cors.php ./config/cors.php
 COPY laravel-app/config/auth.php ./config/auth.php
 COPY laravel-app/bootstrap/app.php ./bootstrap/app.php
