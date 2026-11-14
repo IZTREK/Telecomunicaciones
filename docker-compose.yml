@@ -26,6 +26,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: perroniphone_app
+    # Si el arranque falla (p. ej. MySQL aún no acepta conexiones) se
+    # reintenta solo, en lugar de quedar apagado y que nginx responda 502.
+    restart: unless-stopped
     # Sin volumen a propósito: el código PHP vive dentro de la imagen, así
     # que "docker compose up -d --build" siempre corre la versión actual.
     environment:
@@ -57,7 +60,10 @@ services:
     volumes:
       - perroniphone_mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pperroniphone_root_pass"]
+      # 127.0.0.1 (TCP) y no "localhost" (socket): en el primer arranque MySQL
+      # levanta un servidor temporal sin red; por socket ya responde "vivo"
+      # y Laravel intentaría migrar antes de que el puerto 3306 exista.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-pperroniphone_root_pass"]
       interval: 5s
       timeout: 5s
       retries: 20
