@@ -1,11 +1,14 @@
-# Compilados y temporales de .NET
-backend/PerroniPhoneApi/bin/
-backend/PerroniPhoneApi/obj/
-bin/
-obj/
+# Secretos locales: cada contenedor genera su propio .env (docker/entrypoint.sh)
+.env
+laravel-app/.env
 
-# Configuración local de VS Code (opcional, puedes quitar esta línea si quieres compartirla)
+# Dependencias (se instalan dentro de la imagen de Docker)
+vendor/
+node_modules/
+
+# Configuración local del editor
 .vscode/
+.idea/
 
 # Archivos del sistema
 .DS_Store

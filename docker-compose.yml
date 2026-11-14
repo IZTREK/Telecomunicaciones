@@ -1,18 +1,19 @@
-version: "3.8"
-
 # PerroniPhone — Docker Compose
-# Tres contenedores, tal como pide la documentación del proyecto:
-#   nginx  -> recibe las peticiones HTTP y las reenvía a Laravel (PHP-FPM)
-#   app    -> Laravel (la API, equivalente a lo que antes era ASP.NET Core)
-#   mysql  -> la base de datos (equivalente a lo que antes era SQL Server)
+# Cuatro contenedores:
+#   nginx      -> sirve el frontend (laravel-app/public) y reenvía /api/* a Laravel
+#   app        -> Laravel (PHP-FPM): la API
+#   mysql      -> la base de datos
+#   phpmyadmin -> interfaz web para ver/editar la base
 services:
 
   nginx:
     image: nginx:1.27-alpine
     container_name: perroniphone_nginx
     ports:
-      - "8080:80"
+      - "8080:80"            # http://localhost:8080  <- portal + API
     volumes:
+      # El frontend se monta directo del repo: cambios en HTML/CSS/JS se ven
+      # al recargar el navegador, sin reconstruir nada.
       - ./laravel-app/public:/var/www/public:ro
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
@@ -25,8 +26,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: perroniphone_app
-    volumes:
-      - laravel_app_data:/var/www
+    # Sin volumen a propósito: el código PHP vive dentro de la imagen, así
+    # que "docker compose up -d --build" siempre corre la versión actual.
     environment:
       DB_CONNECTION: mysql
       DB_HOST: mysql
@@ -50,21 +51,21 @@ services:
       MYSQL_PASSWORD: perroniphone_pass
       MYSQL_ROOT_PASSWORD: perroniphone_root_pass
     ports:
-      - "3307:3306"         # 3307 en tu máquina -> 3306 dentro del contenedor
-                             # (evita chocar con un MySQL que ya tengas instalado)
+      # Solo desde tu propia máquina (127.0.0.1): nadie más en la red ni un
+      # túnel de ngrok puede llegar a la base directamente.
+      - "127.0.0.1:3307:3306"
     volumes:
       - perroniphone_mysql_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pperroniphone_root_pass"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
     networks:
       - perroniphone_net
 
-  # Interfaz web para ver/editar la base de datos, como hacían con SSMS.
-  # Entrando a http://localhost:8081 (usuario: perroniphone_user / perroniphone_pass,
-  # o root / perroniphone_root_pass para ver todo).
+  # http://localhost:8081 (perroniphone_user / perroniphone_pass,
+  # o root / perroniphone_root_pass para ver todo). Solo desde tu máquina.
   phpmyadmin:
     image: phpmyadmin:5.2
     container_name: perroniphone_phpmyadmin
@@ -73,7 +74,7 @@ services:
       PMA_HOST: mysql
       PMA_PORT: 3306
     ports:
-      - "8081:80"
+      - "127.0.0.1:8081:80"
     depends_on:
       mysql:
         condition: service_healthy
@@ -82,7 +83,6 @@ services:
 
 volumes:
   perroniphone_mysql_data:
-  laravel_app_data:
 
 networks:
   perroniphone_net:

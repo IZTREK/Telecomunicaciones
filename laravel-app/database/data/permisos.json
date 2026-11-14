@@ -1,0 +1,8 @@
+{
+  "administrador": ["ver_dashboard", "gestionar_usuarios", "editar_roles", "ver_bitacora", "ver_grc", "ver_contabilidad"],
+  "soporte": ["ver_dashboard", "ver_bitacora"],
+  "redes": ["ver_dashboard", "ver_grc"],
+  "encargado": ["ver_dashboard", "gestionar_usuarios", "ver_grc", "ver_contabilidad"],
+  "contabilidad": ["ver_dashboard", "ver_contabilidad"],
+  "cliente": ["ver_dashboard"]
+}

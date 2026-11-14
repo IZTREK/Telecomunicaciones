@@ -3,34 +3,30 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BitacoraController;
 use App\Http\Controllers\Api\ContabilidadController;
+use App\Http\Controllers\Api\PermisosController;
 use App\Http\Controllers\Api\PlanesController;
 use App\Http\Controllers\Api\UsuariosController;
-use App\Http\Middleware\EnsureRole;
 use Illuminate\Support\Facades\Route;
 
 // --- Público: no requiere token ---
-Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::get('/planes', [PlanesController::class, 'index']);
 
-// --- Requiere sesión (JWT válido) ---
-Route::middleware('auth:api')->group(function () {
+// --- Requiere JWT válido y cuenta activa. Cada ruta exige además un
+//     permiso de la matriz (database/data/permisos.json). ---
+Route::middleware(['auth:api', 'cuenta.activa'])->group(function () {
 
-    // Cualquier usuario autenticado puede ver el directorio (dashboard/admin).
-    Route::get('/usuarios', [UsuariosController::class, 'index']);
-
-    // Solo administrador.
-    Route::middleware(EnsureRole::class . ':administrador')->group(function () {
-        Route::put('/usuarios/{id}/rol', [UsuariosController::class, 'actualizarRol']);
-        Route::put('/usuarios/{id}/estado', [UsuariosController::class, 'actualizarEstado']);
+    Route::middleware('permiso:gestionar_usuarios')->group(function () {
+        Route::get('/usuarios', [UsuariosController::class, 'index']);
+        Route::get('/permisos', [PermisosController::class, 'index']);
+        Route::put('/usuarios/{id}/estado', [UsuariosController::class, 'actualizarEstado'])->whereNumber('id');
     });
 
-    // Administrador y soporte.
-    Route::middleware(EnsureRole::class . ':administrador,soporte')->group(function () {
-        Route::get('/bitacora', [BitacoraController::class, 'index']);
-    });
+    Route::put('/usuarios/{id}/rol', [UsuariosController::class, 'actualizarRol'])
+        ->middleware('permiso:editar_roles')
+        ->whereNumber('id');
 
-    // Administrador, encargado y contabilidad.
-    Route::middleware(EnsureRole::class . ':administrador,encargado,contabilidad')->group(function () {
-        Route::get('/contabilidad', [ContabilidadController::class, 'index']);
-    });
+    Route::get('/bitacora', [BitacoraController::class, 'index'])->middleware('permiso:ver_bitacora');
+
+    Route::get('/contabilidad', [ContabilidadController::class, 'index'])->middleware('permiso:ver_contabilidad');
 });

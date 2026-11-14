@@ -1,0 +1,4 @@
+# Los scripts de shell deben tener saltos de línea LF aunque el repo se
+# clone en Windows; con CRLF el contenedor no puede ejecutarlos.
+*.sh text eol=lf
+docker/** text eol=lf

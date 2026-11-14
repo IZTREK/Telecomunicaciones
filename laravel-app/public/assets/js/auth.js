@@ -1,25 +1,16 @@
 /**
- * PerroniPhone — Sesión del lado del cliente (versión con backend real)
- * ------------------------------------------------------------------
- * El token de sesión es un JWT FIRMADO por el servidor; el control de
- * acceso real ocurre en cada endpoint de la API (EnsureRole), lo que
- * hace este archivo en el navegador es solo para mostrar/ocultar UI.
+ * PerroniPhone — Sesión del lado del cliente
+ * ------------------------------------------
+ * El token de sesión es un JWT FIRMADO por el servidor. Los permisos del
+ * usuario llegan en la respuesta del login (vienen de la tabla "permisos",
+ * sincronizada desde laravel-app/database/data/permisos.json), así que el
+ * frontend no tiene su propia copia de la matriz.
+ *
+ * Todo lo que hace este archivo es solo para mostrar/ocultar UI: el control
+ * de acceso real ocurre en cada endpoint de la API (middleware "permiso").
  */
 const PERRONI_AUTH = (() => {
   const SESSION_KEY = "perroni_session";
-
-  // Catálogo central de roles y permisos: ÚNICA fuente de verdad en el
-  // frontend. admin.html y gobierno.html lo consultan en vez de tener
-  // cada uno su propia copia (que es justo como se desincronizó antes).
-  // Debe reflejar lo mismo que hay en la tabla "permisos" del backend.
-  const MAPA_PERMISOS = {
-    administrador: ["ver_dashboard", "gestionar_usuarios", "ver_bitacora", "editar_roles", "ver_grc", "ver_contabilidad"],
-    soporte: ["ver_dashboard", "ver_bitacora"],
-    redes: ["ver_dashboard", "ver_grc"],
-    encargado: ["ver_dashboard", "ver_contabilidad","gestionar_usuarios","ver_grc"],
-    contabilidad: ["ver_dashboard", "ver_contabilidad"],
-    cliente: ["ver_dashboard"],
-  };
 
   function escapeHTML(str) {
     return String(str)
@@ -52,7 +43,8 @@ const PERRONI_AUTH = (() => {
     if (!raw) return null;
     try {
       const datos = JSON.parse(raw);
-      if (new Date(datos.expira) <= new Date()) {
+      // Sesiones guardadas por una versión anterior (sin permisos) no sirven.
+      if (new Date(datos.expira) <= new Date() || !Array.isArray(datos.usuario?.permisos)) {
         cerrarSesion();
         return null;
       }
@@ -80,37 +72,47 @@ const PERRONI_AUTH = (() => {
     }
   }
 
-  function requerirSesion(rolesPermitidos = null) {
+  function tienePermiso(permiso) {
+    return obtenerSesion()?.usuario.permisos.includes(permiso) ?? false;
+  }
+
+  // Protege una página: exige sesión vigente y, opcionalmente, un permiso.
+  function requerirSesion(permiso = null) {
     const sesion = obtenerSesion();
     if (!sesion) {
       window.location.href = "login.html?motivo=sesion";
       return null;
     }
-    if (rolesPermitidos && !rolesPermitidos.includes(sesion.usuario.rol)) {
+    if (permiso && !sesion.usuario.permisos.includes(permiso)) {
       window.location.href = "dashboard.html?motivo=permiso";
       return null;
     }
     return sesion;
   }
 
-  function tienePermiso(rol, permiso) {
-    return (MAPA_PERMISOS[rol] || []).includes(permiso);
-  }
+  /**
+   * Prepara la barra lateral común a las páginas internas:
+   *  - tarjeta con nombre y rol de la sesión,
+   *  - botón de cerrar sesión,
+   *  - enlaces con data-permiso="..." bloqueados si el rol no lo tiene.
+   */
+  function prepararMenu(sesion) {
+    const u = sesion.usuario;
+    document.getElementById("session-card").innerHTML = `
+      <div class="who">${escapeHTML(u.nombre)}</div>
+      <span class="role-pill ${escapeHTML(u.rol)}">${escapeHTML(u.rol)}</span>`;
 
-  // Qué roles tienen cierto permiso (ej. "¿quién puede ver Gobierno/GRC?").
-  // Se deriva del catálogo en vez de escribirse a mano en cada página.
-  function rolesConPermiso(permiso) {
-    return Object.entries(MAPA_PERMISOS)
-      .filter(([, permisos]) => permisos.includes(permiso))
-      .map(([rol]) => rol);
-  }
+    document.getElementById("btn-logout").addEventListener("click", () => {
+      cerrarSesion();
+      window.location.href = "login.html";
+    });
 
-  function obtenerRolesDisponibles() {
-    return Object.keys(MAPA_PERMISOS);
-  }
-
-  function obtenerMapaPermisos() {
-    return Object.fromEntries(Object.entries(MAPA_PERMISOS).map(([r, p]) => [r, [...p]]));
+    document.querySelectorAll(".app-nav a[data-permiso]").forEach((link) => {
+      if (u.permisos.includes(link.dataset.permiso)) return;
+      link.classList.add("locked");
+      link.removeAttribute("href");
+      link.title = "Tu rol no tiene acceso a esta sección";
+    });
   }
 
   return {
@@ -122,8 +124,6 @@ const PERRONI_AUTH = (() => {
     cerrarSesion,
     requerirSesion,
     tienePermiso,
-    rolesConPermiso,
-    obtenerRolesDisponibles,
-    obtenerMapaPermisos,
+    prepararMenu,
   };
 })();

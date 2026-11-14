@@ -69,181 +69,108 @@
   <span class="eyebrow"><span class="dot"></span> Documentación técnica</span>
   <h1>Decisiones de seguridad — Portal PerroniPhone</h1>
   <p class="lead">
-    Este documento explica <b>qué</b> controles de seguridad se implementaron en el
-    portal académico de PerroniPhone, <b>por qué</b> se eligieron y <b>cuáles son sus
-    límites</b> al tratarse de un sitio estático (sin servidor real). El objetivo
-    es que la implementación sea evaluable como ejercicio de seguridad aplicada,
-    no solo como interfaz visual.
+    Este documento explica <b>qué</b> controles de seguridad implementa el portal
+    académico de PerroniPhone, <b>por qué</b> se eligieron y <b>cuáles son sus
+    límites</b>. La versión en Markdown está en <code>SECURITY.md</code> en la raíz
+    del repositorio.
   </p>
 
   <div class="doc-quote">
-    <b>Alcance del proyecto:</b> ASP.NET Core Web API + SQL Server como
-    backend, consumido por un frontend HTML/CSS/JavaScript. Todos los
-    usuarios, correos y contraseñas son ficticios. Las secciones marcadas
-    como "límite conocido" en versiones anteriores de este documento ahora
-    están resueltas del lado del servidor; se conservan aquí para mostrar
-    la evolución del diseño.
-  </div>
-
-  <div class="control" style="border-color:rgba(0,230,195,0.35); margin-bottom:40px;">
-    <h3 style="color:var(--signal);">Actualización: de prototipo estático a backend real</h3>
-    <dl>
-      <dt>Qué cambió</dt>
-      <dd>
-        El hashing de contraseñas pasó de SHA-256 simple (calculado en el
-        navegador) a <b>PBKDF2 con 100,000 iteraciones</b>, calculado y
-        verificado únicamente en el servidor (<code>PasswordHasher.cs</code>).
-        La sesión pasó de un token sin firmar en <code>sessionStorage</code>
-        a un <b>JWT firmado</b> por la API (<code>TokenService.cs</code>),
-        que el cliente no puede alterar. El control de acceso por rol ahora
-        se aplica también en cada endpoint con
-        <code>[Authorize(Roles = "...")]</code>, no solo ocultando botones.
-        El bloqueo por intentos fallidos vive en la tabla <code>Usuarios</code>
-        de SQL Server, no en el navegador. Y todas las consultas usan
-        parámetros (Dapper), lo que previene inyección SQL.
-      </dd>
-    </dl>
+    <b>Alcance:</b> frontend HTML/CSS/JS + API REST en <b>Laravel 11 (PHP 8.3)</b>
+    + <b>MySQL 8</b>, detrás de <b>Nginx</b>, todo en <b>Docker Compose</b>.
+    Todos los usuarios, correos y contraseñas son ficticios. La v1 del proyecto
+    era 100% del lado del cliente y la v2 usaba ASP.NET Core + SQL Server; su
+    historia queda en Git.
   </div>
 
   <div class="doc-section">
     <h2><span class="num">1</span> Autenticación</h2>
-
     <div class="control">
       <h3>1.1 Contraseñas nunca en texto plano</h3>
       <dl>
         <dt>Decisión</dt>
-        <dd>Cada fila en la tabla <code>Usuarios</code> de SQL Server guarda
-          un <code>Salt</code> aleatorio y un <code>HashPassword</code>
-          derivado con <b>PBKDF2 (HMAC-SHA256, 100,000 iteraciones)</b>,
-          calculado y verificado únicamente en el servidor
-          (<code>Services/PasswordHasher.cs</code>). La contraseña que
-          escribes en el formulario viaja al backend por HTTPS/HTTP y ahí se
-          verifica; nunca se compara ni se guarda en texto plano.</dd>
+        <dd>Cada fila de <code>usuarios</code> guarda un <code>salt</code> aleatorio y un <code>hash_password</code> derivado con <b>PBKDF2-HMAC-SHA256, 100,000 iteraciones</b> (<code>app/Services/PasswordHasher.php</code>). La comparación usa <code>hash_equals()</code>, en tiempo constante.</dd>
         <dt>Por qué</dt>
-        <dd>PBKDF2 está diseñado específicamente para contraseñas: es lento
-          a propósito, lo que dificulta ataques de fuerza bruta y de
-          diccionario, a diferencia de un hash genérico como SHA-256 solo.</dd>
-        <dt style="color:var(--signal);">Resuelto respecto a la v1</dt>
-        <dd>La primera versión del proyecto (sin backend) calculaba SHA-256
-          en el propio navegador. Ahora el cómputo ocurre exclusivamente en
-          el servidor, que es como debe hacerse en producción.</dd>
+        <dd>PBKDF2 es lento a propósito: encarece la fuerza bruta y los diccionarios si alguien obtuviera la base.</dd>
+        <dt class="limite">Límite</dt>
+        <dd>Hoy se prefiere Argon2id o bcrypt (<code>Hash::make()</code> de Laravel). Se conservó PBKDF2 por continuidad con la v2.</dd>
       </dl>
     </div>
-
     <div class="control">
-      <h3>1.2 Mensajes de error genéricos</h3>
+      <h3>1.2 Sin enumeración de usuarios</h3>
       <dl>
         <dt>Decisión</dt>
-        <dd>Si el correo no existe o la contraseña es incorrecta, se muestra el
-          mismo mensaje ("Correo o contraseña incorrectos").</dd>
+        <dd>Si el correo no existe, la contraseña es incorrecta <b>o la cuenta está bloqueada</b>, la respuesta es siempre <code>401 "Correo o contraseña incorrectos."</code>. El motivo real solo se explica cuando la contraseña es correcta. Para correos inexistentes se calcula igualmente un PBKDF2 de relleno, así la respuesta tarda lo mismo.</dd>
         <dt>Por qué</dt>
-        <dd>Evita que un atacante pueda enumerar qué correos están registrados
-          en el sistema (<i>user enumeration</i>).</dd>
+        <dd>Nadie puede averiguar qué correos están registrados ni por el mensaje, ni por el código HTTP, ni midiendo el tiempo de respuesta.</dd>
       </dl>
     </div>
-
     <div class="control">
-      <h3>1.3 Bloqueo por intentos fallidos (mitigación de fuerza bruta)</h3>
+      <h3>1.3 Bloqueo por intentos fallidos (por cuenta)</h3>
       <dl>
         <dt>Decisión</dt>
-        <dd>Tras 5 intentos fallidos sobre el mismo correo, la cuenta se
-          bloquea temporalmente 2 minutos (<code>registrarIntentoFallido</code>
-          en <code>auth.js</code>). Además, el directorio de usuarios incluye
-          una cuenta ya bloqueada de forma permanente para demostrar el estado
-          "bloqueado" administrado manualmente.</dd>
-        <dt class="limite">Límite conocido</dt>
-        <dd>El conteo vive en <code>sessionStorage</code> del navegador, por
-          lo que un atacante podría evadirlo abriendo una pestaña nueva. En
-          producción, el conteo debe llevarse en el servidor, idealmente por
-          combinación de cuenta + dirección IP, con <i>rate limiting</i> a
-          nivel de infraestructura (por ejemplo, un WAF o middleware
-          dedicado).</dd>
+        <dd>Al 5º intento fallido la cuenta se bloquea 2 minutos (<code>bloqueado_hasta</code>). Durante el bloqueo los intentos no cuentan; al vencer, el contador vuelve a cero. El incremento es atómico (transacción con <code>SELECT … FOR UPDATE</code>): peticiones simultáneas no pueden saltarse el límite.</dd>
+      </dl>
+    </div>
+    <div class="control">
+      <h3>1.4 Límite de peticiones (por IP)</h3>
+      <dl>
+        <dt>Decisión</dt>
+        <dd><code>POST /api/auth/login</code> acepta 20 peticiones por minuto por IP (<code>AppServiceProvider</code>). Laravel solo confía en <code>X-Forwarded-For</code> si la petición viene de una red privada (nginx o ngrok), así que la IP no se puede falsificar.</dd>
+        <dt>Por qué</dt>
+        <dd>El bloqueo por cuenta no frena a quien prueba muchas cuentas distintas; éste sí, y además limita el costo de CPU de PBKDF2.</dd>
       </dl>
     </div>
   </div>
 
   <div class="doc-section">
-    <h2><span class="num">2</span> Gestión de sesión</h2>
+    <h2><span class="num">2</span> Gestión de sesión (JWT)</h2>
     <div class="control">
       <dl>
         <dt>Decisión</dt>
-        <dd>Al autenticarse, se genera un objeto de sesión (<code>id</code>,
-          <code>rol</code>, <code>correo</code>, tiempos de emisión/expiración)
-          codificado en Base64 y guardado en <code>sessionStorage</code>, con
-          expiración de 20 minutos. Cada página protegida llama a
-          <code>requerirSesion()</code> antes de mostrar contenido.</dd>
-        <dt>Por qué <code>sessionStorage</code> y no <code>localStorage</code></dt>
-        <dd><code>sessionStorage</code> se destruye al cerrar la
-          pestaña/navegador, reduciendo la ventana de exposición frente a
-          <code>localStorage</code>, que persiste indefinidamente.</dd>
-        <dt class="limite">Límite conocido</dt>
-        <dd>Este token <b>no está firmado criptográficamente</b>; cualquier
-          persona con las herramientas de desarrollador del navegador podría
-          editarlo. Es aceptable solo porque no hay datos reales ni backend
-          que confíe en ese token. En producción, la sesión debe representarse
-          con una <b>cookie httpOnly, Secure y SameSite=Strict</b>, o un JWT
-          firmado por el servidor y validado en cada petición.</dd>
+        <dd>La API emite un <b>JWT firmado</b> (HS256) con vigencia de 20 minutos. El navegador lo guarda en <code>sessionStorage</code> y lo envía en <code>Authorization: Bearer</code>. <code>APP_KEY</code> y <code>JWT_SECRET</code> no están en el repositorio ni en la imagen: <code>docker/entrypoint.sh</code> los genera al crear cada contenedor.</dd>
+        <dt>Cuenta bloqueada = sesión terminada</dt>
+        <dd>El middleware <code>cuenta.activa</code> revisa el estado en la base en cada petición: si un administrador bloquea una cuenta, su token deja de servir de inmediato.</dd>
+        <dt class="limite">Límite</dt>
+        <dd>No hay lista de revocación (cerrar sesión borra el token del navegador, pero sigue siendo válido hasta expirar) y un XSS podría leer <code>sessionStorage</code>. En producción: cookie <code>httpOnly</code> + <code>Secure</code> + <code>SameSite</code> y <i>refresh tokens</i>.</dd>
       </dl>
     </div>
   </div>
 
   <div class="doc-section">
-    <h2><span class="num">3</span> Control de acceso basado en roles (RBAC)</h2>
+    <h2><span class="num">3</span> Control de acceso (RBAC por permisos)</h2>
     <div class="control">
       <dl>
-        <dt>Decisión</dt>
-        <dd>Existen tres roles — <code>administrador</code>, <code>soporte</code>
-          y <code>cliente</code> — cada uno con una lista explícita de
-          permisos. El dashboard oculta secciones en el navegador según el
-          permiso del rol, <b>y además</b> cada endpoint sensible de la API
-          está marcado con <code>[Authorize(Roles = "administrador")]</code>
-          (por ejemplo, <code>PUT /api/usuarios/{id}/rol</code>), por lo que
-          el servidor rechaza la petición con <code>403</code> aunque alguien
-          intente llamarla directamente sin pasar por la interfaz.</dd>
-        <dt>Por qué</dt>
-        <dd>El principio de <b>mínimo privilegio</b>: cada rol ve y hace solo
-          lo necesario para su función.</dd>
-        <dt style="color:var(--signal);">Resuelto respecto a la v1</dt>
-        <dd>En la primera versión, ocultar botones en el DOM era la única
-          barrera ("seguridad de interfaz"). Ahora la autorización se
-          revalida en cada endpoint del backend, que es la barrera real.</dd>
+        <dt>Una sola fuente de verdad</dt>
+        <dd><code>laravel-app/database/data/permisos.json</code> define los permisos de cada rol; el seeder lo sincroniza con la tabla <code>permisos</code> en cada arranque.</dd>
+        <dt>Backend (la barrera real)</dt>
+        <dd>Cada ruta exige un permiso con el middleware <code>permiso:&lt;nombre&gt;</code>, que consulta el <b>rol actual de la base</b>: <code>gestionar_usuarios</code> (directorio y bloqueo), <code>editar_roles</code> (cambio de rol), <code>ver_bitacora</code> y <code>ver_contabilidad</code>. Nadie puede modificar su propia cuenta y solo un administrador puede modificar a otro, así que siempre queda al menos un administrador activo.</dd>
+        <dt>Frontend (solo interfaz)</dt>
+        <dd>El login devuelve la lista de permisos del usuario; las páginas la usan para bloquear enlaces y redirigir, pero nunca es la barrera.</dd>
+        <dt class="limite">Límite</dt>
+        <dd>Las matrices GRC de <code>gobierno.html</code> viven en <code>assets/js/grc.js</code>, un archivo público: esa restricción es de interfaz (el análisis también es público en <code>docs/</code>).</dd>
       </dl>
     </div>
   </div>
 
   <div class="doc-section">
-    <h2><span class="num">4</span> Protección contra XSS</h2>
+    <h2><span class="num">4</span> Inyección SQL y XSS</h2>
     <div class="control">
       <dl>
-        <dt>Decisión</dt>
-        <dd>Toda información dinámica que proviene de la "base de datos"
-          (nombres, correos, roles) se inserta en el DOM a través de la
-          función <code>escapeHTML()</code>, que convierte caracteres como
-          <code>&lt;</code>, <code>&gt;</code> y <code>"</code> en entidades
-          HTML antes de escribirlos.</dd>
-        <dt>Por qué</dt>
-        <dd>Modela la disciplina de nunca insertar texto no controlado
-          directamente en el HTML, la causa más común de XSS en aplicaciones
-          reales.</dd>
+        <dt>Inyección SQL</dt>
+        <dd>Todas las consultas usan Eloquent / Query Builder con parámetros enlazados; nunca se concatena texto del usuario en SQL.</dd>
+        <dt>XSS</dt>
+        <dd>Todo dato dinámico se inserta en el DOM con <code>escapeHTML()</code>, que convierte <code>&amp; &lt; &gt; &quot; &#039;</code> en entidades HTML.</dd>
       </dl>
     </div>
   </div>
 
   <div class="doc-section">
-    <h2><span class="num">5</span> Protección conceptual contra CSRF</h2>
+    <h2><span class="num">5</span> CSRF y CORS</h2>
     <div class="control">
       <dl>
         <dt>Decisión</dt>
-        <dd>El formulario de login incluye un campo oculto
-          <code>csrf_token</code>, generado con <code>crypto.randomUUID()</code>
-          y guardado en <code>sessionStorage</code>. Al enviar el formulario,
-          se valida que el token coincida, y se genera uno nuevo tras cada
-          intento.</dd>
-        <dt class="limite">Límite conocido</dt>
-        <dd>Un token CSRF solo protege de verdad cuando lo <b>emite y valida
-          el servidor</b> en cada envío que modifique estado. Aquí es un
-          ejercicio didáctico del patrón, no una protección efectiva por
-          sí sola.</dd>
+        <dd>La API no usa cookies de sesión: la credencial viaja en el header <code>Authorization</code>, que un sitio externo no puede hacer que el navegador envíe solo, por lo que no hace falta token anti-CSRF. Frontend y API comparten origen, así que CORS no permite ningún origen externo por defecto.</dd>
       </dl>
     </div>
   </div>
@@ -252,11 +179,10 @@
     <h2><span class="num">6</span> Validación de entradas</h2>
     <div class="control">
       <dl>
-        <dt>Decisión</dt>
-        <dd>El correo se valida con una expresión regular antes de intentar
-          autenticar, y la contraseña recibe retroalimentación de fuerza en
-          tiempo real sin bloquear el envío, para no filtrar la política
-          exacta de contraseñas a un posible atacante.</dd>
+        <dt>Servidor</dt>
+        <dd>El login exige un correo con formato válido (máx. 150 caracteres) y una contraseña de máx. 200. Roles y estados se validan contra listas blancas; los IDs de las rutas solo aceptan números.</dd>
+        <dt>Cliente</dt>
+        <dd>El correo se valida con una expresión regular antes de enviarlo y se muestra la fuerza estimada de la contraseña (solo informativo).</dd>
       </dl>
     </div>
   </div>
@@ -266,50 +192,41 @@
     <div class="control">
       <dl>
         <dt>Decisión</dt>
-        <dd>La tabla <code>Bitacora</code> en SQL Server registra eventos
-          reales (accesos correctos, intentos fallidos, bloqueos, cambios de
-          rol) cada vez que ocurren, insertados directamente por
-          <code>AuthController</code> y <code>UsuariosController</code>. El
-          endpoint <code>GET /api/bitacora</code> solo es accesible para los
-          roles <code>soporte</code> y <code>administrador</code>.</dd>
-        <dt>Por qué</dt>
-        <dd>La trazabilidad es un control de seguridad en sí mismo: permite
-          detectar y explicar incidentes después de que ocurren.</dd>
-        <dt style="color:var(--signal);">Resuelto respecto a la v1</dt>
-        <dd>Antes era un arreglo estático de ejemplo en JavaScript. Ahora es
-          un registro persistente en la base de datos, protegido por el
-          mismo control de acceso por rol que el resto de la API.</dd>
+        <dd>La tabla <code>bitacora</code> registra accesos correctos, intentos con correos inexistentes, bloqueos automáticos, cambios de rol y bloqueos manuales con el código del responsable. Solo la ven los roles con <code>ver_bitacora</code>.</dd>
+        <dt class="limite">Límite</dt>
+        <dd>No se guarda la IP de origen y los registros no son inmutables.</dd>
       </dl>
     </div>
   </div>
 
   <div class="doc-section">
-    <h2><span class="num">8</span> Resumen de límites generales</h2>
-    <p style="font-size:0.92rem;">
-      Por ser un proyecto 100% del lado del cliente, ningún control aquí
-      sustituye una implementación real de backend. La tabla resume el
-      paralelismo entre lo simulado y lo recomendado en producción:
-    </p>
+    <h2><span class="num">8</span> Infraestructura (Docker)</h2>
+    <div class="control">
+      <dl>
+        <dt>Decisión</dt>
+        <dd>El <code>.env</code> no se versiona; cada contenedor crea el suyo con llaves nuevas. <code>APP_DEBUG=false</code>: un error 500 no muestra stack traces. MySQL y phpMyAdmin solo escuchan en <code>127.0.0.1</code>; solo se publica nginx (puerto 8080). Nginx bloquea archivos ocultos como <code>.env</code>.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="doc-section">
+    <h2><span class="num">9</span> Resumen de límites conocidos</h2>
     <div class="doc-table-wrap">
       <table>
         <thead>
-          <tr><th>Control simulado en el portal</th><th>Equivalente recomendado en producción</th></tr>
+          <tr><th>Control actual</th><th>Mejora recomendada en producción</th></tr>
         </thead>
         <tbody>
-          <tr><td>Hash SHA-256 + salt en el navegador</td><td>bcrypt/Argon2 calculado y verificado en el servidor</td></tr>
-          <tr><td>Token de sesión en sessionStorage</td><td>Cookie httpOnly + Secure + SameSite, o JWT firmado</td></tr>
-          <tr><td>Bloqueo por intentos en el cliente</td><td>Rate limiting por cuenta + IP en el servidor/WAF</td></tr>
-          <tr><td>RBAC que oculta botones en el DOM</td><td>Autorización revalidada en cada endpoint del backend</td></tr>
-          <tr><td>Token CSRF simulado</td><td>Token CSRF emitido y validado por el servidor</td></tr>
-          <tr><td>Bitácora estática de ejemplo</td><td>Registro de auditoría persistente y protegido</td></tr>
+          <tr><td>PBKDF2 (100k iteraciones)</td><td>Argon2id / bcrypt con Hash::make()</td></tr>
+          <tr><td>JWT en sessionStorage, sin revocación</td><td>Cookie httpOnly + Secure + SameSite, refresh tokens y lista de revocación</td></tr>
+          <tr><td>Rate limit por IP en la aplicación</td><td>Además, WAF / rate limit en el borde</td></tr>
+          <tr><td>Bitácora sin IP y editable</td><td>Registro inmutable con IP, enviado a un SIEM</td></tr>
+          <tr><td>Contraseñas de demo publicadas en el README</td><td>Contraseña temporal y cambio obligatorio</td></tr>
+          <tr><td>Laravel 11 sin soporte de seguridad</td><td>Actualizar a una versión con soporte vigente</td></tr>
+          <tr><td>HTTP en local</td><td>HTTPS obligatorio (ngrok ya lo da en el túnel público)</td></tr>
         </tbody>
       </table>
     </div>
-    <p style="font-size:0.92rem; margin-top:20px;">
-      Este enfoque permite demostrar el razonamiento y las decisiones de
-      diseño de seguridad propias de un portal corporativo, dentro de las
-      restricciones de un proyecto académico sin infraestructura de servidor.
-    </p>
   </div>
 </div>
 
