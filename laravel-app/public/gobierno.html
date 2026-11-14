@@ -14,9 +14,9 @@
     <a href="index.html" class="brand"><span class="bars"><i></i><i></i><i></i><i></i></span> PerroniPhone</a>
     <nav class="app-nav">
       <a href="dashboard.html"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="10" width="3.4" height="7.5" rx="1"/><rect x="8.3" y="5.5" width="3.4" height="12" rx="1"/><rect x="14.1" y="2.5" width="3.4" height="15" rx="1"/></svg> Panel</a>
-      <a href="gobierno.html" class="active"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M10 2.2 16.5 5v5.2c0 4-2.7 6.6-6.5 7.6-3.8-1-6.5-3.6-6.5-7.6V5z" fill="none" stroke-width="1.6"/><path d="M7.2 10.2l2 2 3.6-4" fill="none" stroke-width="1.6"/></svg> Gobierno y riesgos</a>
-      <a href="admin.html" id="link-admin"><svg class="nav-ic" viewBox="0 0 20 20"><circle cx="7" cy="6.5" r="3"/><path d="M1.5 17c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5" fill="none" stroke-width="1.6"/><circle cx="15" cy="7.5" r="2.4" fill="none" stroke-width="1.6"/><path d="M12.7 17c.2-2.6 1.9-4.4 4.3-4.4" fill="none" stroke-width="1.6"/></svg> Usuarios y roles</a>
-      <a href="contabilidad.html" id="link-contabilidad"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="15" height="15" rx="2" fill="none" stroke-width="1.6"/><path d="M6 11.5l2.5 2.5L14 8" fill="none" stroke-width="1.6"/></svg> Contabilidad</a>
+      <a href="gobierno.html" class="active" data-permiso="ver_grc"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M10 2.2 16.5 5v5.2c0 4-2.7 6.6-6.5 7.6-3.8-1-6.5-3.6-6.5-7.6V5z" fill="none" stroke-width="1.6"/><path d="M7.2 10.2l2 2 3.6-4" fill="none" stroke-width="1.6"/></svg> Gobierno y riesgos</a>
+      <a href="admin.html" data-permiso="gestionar_usuarios"><svg class="nav-ic" viewBox="0 0 20 20"><circle cx="7" cy="6.5" r="3"/><path d="M1.5 17c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5" fill="none" stroke-width="1.6"/><circle cx="15" cy="7.5" r="2.4" fill="none" stroke-width="1.6"/><path d="M12.7 17c.2-2.6 1.9-4.4 4.3-4.4" fill="none" stroke-width="1.6"/></svg> Usuarios y roles</a>
+      <a href="contabilidad.html" data-permiso="ver_contabilidad"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="15" height="15" rx="2" fill="none" stroke-width="1.6"/><path d="M6 11.5l2.5 2.5L14 8" fill="none" stroke-width="1.6"/></svg> Contabilidad</a>
       <a href="index.html"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M2.5 9.5 10 3l7.5 6.5" fill="none" stroke-width="1.6"/><path d="M4.5 8.5V17h11V8.5" fill="none" stroke-width="1.6"/></svg> Portal público</a>
     </nav>
     <div class="session-card" id="session-card"></div>
@@ -118,12 +118,12 @@
       <h2>Documentación completa</h2>
       <p class="panel-sub">Este tablero resume el análisis; el detalle vive en el repositorio.</p>
       <ul class="log-list" style="font-family:var(--f-body); font-size:0.88rem;">
-        <li><span class="log-time">docs/01</span> <a href="docs/01-contexto.md">Contexto del proyecto</a></li>
-        <li><span class="log-time">docs/02</span> <a href="docs/02-gobierno-ti.md">Gobierno de TI</a></li>
-        <li><span class="log-time">docs/03</span> <a href="docs/03-alineacion-estrategica.md">Alineación estratégica</a></li>
-        <li><span class="log-time">docs/04</span> <a href="docs/04-matriz-activos.md">Matriz de activos</a></li>
-        <li><span class="log-time">docs/05</span> <a href="docs/05-matriz-riesgos.md">Matriz de riesgos</a></li>
-        <li><span class="log-time">docs/06</span> <a href="docs/06-matriz-controles.md">Matriz de controles</a></li>
+        <li><span class="log-time">docs/01</span> <a target="_blank" rel="noopener" href="https://github.com/IZTREK/Telecomunicaciones/blob/main/docs/01-contexto.md">Contexto del proyecto</a></li>
+        <li><span class="log-time">docs/02</span> <a target="_blank" rel="noopener" href="https://github.com/IZTREK/Telecomunicaciones/blob/main/docs/02-gobierno-ti.md">Gobierno de TI</a></li>
+        <li><span class="log-time">docs/03</span> <a target="_blank" rel="noopener" href="https://github.com/IZTREK/Telecomunicaciones/blob/main/docs/03-alineacion-estrategica.md">Alineación estratégica</a></li>
+        <li><span class="log-time">docs/04</span> <a target="_blank" rel="noopener" href="https://github.com/IZTREK/Telecomunicaciones/blob/main/docs/04-matriz-activos.md">Matriz de activos</a></li>
+        <li><span class="log-time">docs/05</span> <a target="_blank" rel="noopener" href="https://github.com/IZTREK/Telecomunicaciones/blob/main/docs/05-matriz-riesgos.md">Matriz de riesgos</a></li>
+        <li><span class="log-time">docs/06</span> <a target="_blank" rel="noopener" href="https://github.com/IZTREK/Telecomunicaciones/blob/main/docs/06-matriz-controles.md">Matriz de controles</a></li>
       </ul>
     </div>
   </main>
@@ -133,37 +133,15 @@
 <script src="assets/js/auth.js"></script>
 <script src="assets/js/grc.js"></script>
 <script>
-  // Los roles con acceso se derivan del permiso "ver_grc" del catálogo
-  // central en auth.js, no de una lista escrita a mano aquí.
-  const rolesConAcceso = PERRONI_AUTH.rolesConPermiso("ver_grc");
-  const sesion = PERRONI_AUTH.requerirSesion(rolesConAcceso);
+  const sesion = PERRONI_AUTH.requerirSesion("ver_grc");
 
   if (sesion) {
     const esc = PERRONI_AUTH.escapeHTML;
-    const u = sesion.usuario;
     // "Crítico" -> "critico": las clases CSS de nivel se escriben sin acento.
     const ACENTOS = { "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u" };
     const slug = (s) => s.toLowerCase().replace(/[áéíóú]/g, (c) => ACENTOS[c]);
 
-    document.getElementById("session-card").innerHTML = `
-      <div class="who">${esc(u.nombre)}</div>
-      <span class="role-pill ${esc(u.rol)}">${esc(u.rol)}</span>`;
-
-    document.getElementById("btn-logout").addEventListener("click", () => {
-      PERRONI_AUTH.cerrarSesion();
-      window.location.href = "login.html";
-    });
-
-    function bloquearSiNoTienePermiso(idEnlace, permiso) {
-      if (PERRONI_AUTH.tienePermiso(u.rol, permiso)) return;
-      const link = document.getElementById(idEnlace);
-      if (!link) return;
-      link.classList.add("locked");
-      link.removeAttribute("href");
-      link.title = "Tu rol no tiene acceso a esta sección";
-    }
-    bloquearSiNoTienePermiso("link-admin", "gestionar_usuarios");
-    bloquearSiNoTienePermiso("link-contabilidad", "ver_contabilidad");
+    PERRONI_AUTH.prepararMenu(sesion);
 
     // ---------- KPI ----------
     document.getElementById("kpi-grid").innerHTML = PERRONI_GRC.kpis.map(k => `

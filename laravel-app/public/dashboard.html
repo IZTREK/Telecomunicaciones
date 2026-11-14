@@ -14,9 +14,9 @@
     <a href="index.html" class="brand"><span class="bars"><i></i><i></i><i></i><i></i></span> PerroniPhone</a>
     <nav class="app-nav">
       <a href="dashboard.html" class="active"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="10" width="3.4" height="7.5" rx="1"/><rect x="8.3" y="5.5" width="3.4" height="12" rx="1"/><rect x="14.1" y="2.5" width="3.4" height="15" rx="1"/></svg> Panel</a>
-      <a href="gobierno.html" id="link-grc"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M10 2.2 16.5 5v5.2c0 4-2.7 6.6-6.5 7.6-3.8-1-6.5-3.6-6.5-7.6V5z" fill="none" stroke-width="1.6"/><path d="M7.2 10.2l2 2 3.6-4" fill="none" stroke-width="1.6"/></svg> Gobierno y riesgos</a>
-      <a href="admin.html" id="link-admin"><svg class="nav-ic" viewBox="0 0 20 20"><circle cx="7" cy="6.5" r="3"/><path d="M1.5 17c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5" fill="none" stroke-width="1.6"/><circle cx="15" cy="7.5" r="2.4" fill="none" stroke-width="1.6"/><path d="M12.7 17c.2-2.6 1.9-4.4 4.3-4.4" fill="none" stroke-width="1.6"/></svg> Usuarios y roles</a>
-      <a href="contabilidad.html" id="link-contabilidad"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="15" height="15" rx="2" fill="none" stroke-width="1.6"/><path d="M6 11.5l2.5 2.5L14 8" fill="none" stroke-width="1.6"/></svg> Contabilidad</a>
+      <a href="gobierno.html" data-permiso="ver_grc"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M10 2.2 16.5 5v5.2c0 4-2.7 6.6-6.5 7.6-3.8-1-6.5-3.6-6.5-7.6V5z" fill="none" stroke-width="1.6"/><path d="M7.2 10.2l2 2 3.6-4" fill="none" stroke-width="1.6"/></svg> Gobierno y riesgos</a>
+      <a href="admin.html" data-permiso="gestionar_usuarios"><svg class="nav-ic" viewBox="0 0 20 20"><circle cx="7" cy="6.5" r="3"/><path d="M1.5 17c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5" fill="none" stroke-width="1.6"/><circle cx="15" cy="7.5" r="2.4" fill="none" stroke-width="1.6"/><path d="M12.7 17c.2-2.6 1.9-4.4 4.3-4.4" fill="none" stroke-width="1.6"/></svg> Usuarios y roles</a>
+      <a href="contabilidad.html" data-permiso="ver_contabilidad"><svg class="nav-ic" viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="15" height="15" rx="2" fill="none" stroke-width="1.6"/><path d="M6 11.5l2.5 2.5L14 8" fill="none" stroke-width="1.6"/></svg> Contabilidad</a>
       <a href="index.html"><svg class="nav-ic" viewBox="0 0 20 20"><path d="M2.5 9.5 10 3l7.5 6.5" fill="none" stroke-width="1.6"/><path d="M4.5 8.5V17h11V8.5" fill="none" stroke-width="1.6"/></svg> Portal público</a>
     </nav>
     <div class="session-card" id="session-card"></div>
@@ -77,16 +77,20 @@
   if (sesion) {
     const esc = PERRONI_AUTH.escapeHTML;
     const u = sesion.usuario;
+    PERRONI_AUTH.prepararMenu(sesion);
+
+    // Si una página nos regresó aquí por falta de permiso, se avisa.
+    if (new URLSearchParams(window.location.search).get("motivo") === "permiso") {
+      const badge = document.getElementById("estado-badge");
+      badge.textContent = "Sin permiso para esa sección";
+      badge.className = "badge bloqueado";
+    }
 
     document.getElementById("saludo").textContent = `Hola, ${u.nombre.split(" ")[0]}`;
     document.getElementById("submensaje").textContent =
       u.rol === "administrador" ? "Tienes acceso completo al portal."
-      : u.rol === "soporte" ? "Tienes acceso de consulta y monitoreo."
+      : u.permisos.length > 1 ? "Estas son las secciones disponibles para tu rol."
       : "Este es el resumen de tu cuenta.";
-
-    document.getElementById("session-card").innerHTML = `
-      <div class="who">${esc(u.nombre)}</div>
-      <span class="role-pill ${esc(u.rol)}">${esc(u.rol)}</span>`;
 
     document.getElementById("cuenta-tabla").innerHTML = `
       <tr><td>ID de usuario</td><td class="cell-id">${esc(u.codigoUsuario)}</td></tr>
@@ -94,9 +98,9 @@
       <tr><td>Rol asignado</td><td><span class="role-pill ${esc(u.rol)}">${esc(u.rol)}</span></td></tr>
       <tr><td>Sesión expira</td><td class="mono">${new Date(sesion.expira).toLocaleTimeString("es-MX")}</td></tr>`;
 
-    // Control de acceso por rol: la bitácora solo es visible para soporte/administrador.
-    // El backend también rechaza la petición (403) si el rol no tiene permiso.
-    if (PERRONI_AUTH.tienePermiso(u.rol, "ver_bitacora")) {
+    // La bitácora solo se pide si el rol tiene "ver_bitacora".
+    // El backend también rechaza la petición (403) si no lo tiene.
+    if (PERRONI_AUTH.tienePermiso("ver_bitacora")) {
       PERRONI_API.obtenerBitacora(sesion.token)
         .then((eventos) => {
           document.getElementById("bitacora-lista").innerHTML = eventos.map(ev => `
@@ -105,31 +109,13 @@
               <span class="log-${esc(ev.tipo)}">${esc(ev.mensaje)}</span>
             </li>`).join("");
         })
-        .catch(() => {
+        .catch((err) => {
           document.getElementById("bitacora-lista").innerHTML =
-            `<li style="color:var(--ink-faint);">No se pudo cargar la bitácora (¿está corriendo la API?).</li>`;
+            `<li style="color:var(--ink-faint);">No se pudo cargar la bitácora (${esc(err.message)}).</li>`;
         });
     } else {
       document.getElementById("panel-bitacora").style.display = "none";
     }
-
-    // Bloquea en el menú las secciones que el rol no tiene permitido abrir.
-    function bloquearSiNoTienePermiso(idEnlace, permiso) {
-      if (PERRONI_AUTH.tienePermiso(u.rol, permiso)) return;
-      const link = document.getElementById(idEnlace);
-      if (!link) return;
-      link.classList.add("locked");
-      link.removeAttribute("href");
-      link.title = "Tu rol no tiene acceso a esta sección";
-    }
-    bloquearSiNoTienePermiso("link-grc", "ver_grc");
-    bloquearSiNoTienePermiso("link-contabilidad", "ver_contabilidad");
-    bloquearSiNoTienePermiso("link-admin", "gestionar_usuarios");
-
-    document.getElementById("btn-logout").addEventListener("click", () => {
-      PERRONI_AUTH.cerrarSesion();
-      window.location.href = "login.html";
-    });
   }
 </script>
 </body>

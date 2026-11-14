@@ -4,11 +4,8 @@ namespace App\Services;
 
 /**
  * Hashing de contraseñas con PBKDF2 (HMAC-SHA256, 100,000 iteraciones).
- * Es el mismo algoritmo y los mismos parámetros que usábamos en
- * PasswordHasher.cs (ASP.NET Core) — por eso los usuarios ficticios se
- * pudieron migrar con el mismo salt/hash sin tener que inventar
- * contraseñas nuevas. PHP trae hash_pbkdf2() en el núcleo del lenguaje,
- * no requiere ningún paquete adicional.
+ * Mismos parámetros que la v1 en ASP.NET Core (PasswordHasher.cs). PHP trae
+ * hash_pbkdf2() en el núcleo del lenguaje, no requiere ningún paquete.
  */
 class PasswordHasher
 {

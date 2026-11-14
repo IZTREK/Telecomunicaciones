@@ -246,10 +246,11 @@ footer p { margin: 0; font-size: 0.85rem; color: var(--ink-faint); }
   border-top: 1px solid var(--line); padding-top: 16px; margin-top: 16px;
 }
 .session-card .who { font-size: 0.86rem; font-weight: 600; }
-.session-card .role-pill {
+.role-pill {
   display: inline-block; font-family: var(--f-mono); font-size: 0.7rem; text-transform: uppercase;
-  padding: 3px 8px; border-radius: 100px; margin-top: 6px; background: var(--bg-elevated); color: var(--ink-dim);
+  padding: 3px 8px; border-radius: 100px; background: var(--bg-elevated); color: var(--ink-dim);
 }
+.session-card .role-pill { margin-top: 6px; }
 .role-pill.administrador { background: var(--signal-soft); color: var(--signal); }
 .role-pill.soporte { background: var(--alert-soft); color: var(--alert); }
 .role-pill.cliente { background: var(--bg-elevated-2); color: var(--ink-dim); }
@@ -291,6 +292,8 @@ tbody tr:hover { background: rgba(237,239,247,0.02); }
   font-size: 0.76rem; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-family: var(--f-body);
 }
 .icon-btn:hover { border-color: var(--signal); color: var(--signal); }
+.icon-btn:disabled, .select-role:disabled { opacity: 0.4; cursor: not-allowed; }
+.icon-btn:disabled:hover { border-color: var(--line-strong); color: var(--ink-dim); }
 
 .select-role { background: var(--bg-elevated); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 6px; padding: 6px 8px; font-size: 0.82rem; }
 

@@ -1,7 +1,7 @@
 /**
  * Validador de las matrices de GRC.
  * -----------------------------------
- * Comprueba que los datos de assets/js/grc.js sean internamente coherentes:
+ * Comprueba que los datos de laravel-app/public/assets/js/grc.js sean internamente coherentes:
  * que el nivel de cada riesgo corresponda a la matriz de calor, que las
  * referencias cruzadas entre activos, riesgos y controles existan en ambos
  * sentidos, y que la criticidad de cada activo sea el maximo de C, I y D.
@@ -14,13 +14,12 @@ const path = require("path");
 const raiz = path.join(__dirname, "..");
 const leer = (p) => fs.readFileSync(path.join(raiz, p), "utf8");
 
-// Los archivos del portal declaran const de nivel superior: se evaluan juntos
-// y se exponen en globalThis para poder inspeccionarlos desde aqui.
-eval(
-  leer("assets/js/grc.js") +
-  leer("assets/js/db.js") +
-  ";globalThis.PERRONI_GRC = PERRONI_GRC; globalThis.PERRONI_DB = PERRONI_DB;"
-);
+// grc.js declara un const de nivel superior: se evalua y se expone en
+// globalThis para poder inspeccionarlo desde aqui.
+eval(leer("laravel-app/public/assets/js/grc.js") + ";globalThis.PERRONI_GRC = PERRONI_GRC;");
+
+// Matriz de permisos por rol: la misma que el seeder carga en la base.
+const PERMISOS = JSON.parse(leer("laravel-app/database/data/permisos.json"));
 
 let fallos = 0;
 const err = (m) => { console.log("FALLA: " + m); fallos++; };
@@ -64,7 +63,7 @@ for (const a of PERRONI_GRC.activos) {
 }
 
 // 5. El permiso ver_grc existe en la matriz de permisos del portal.
-const conGrc = Object.entries(PERRONI_DB.permisos).filter(([, p]) => p.includes("ver_grc")).map(([r]) => r);
+const conGrc = Object.entries(PERMISOS).filter(([, p]) => p.includes("ver_grc")).map(([r]) => r);
 if (conGrc.length === 0) err("ningun rol tiene el permiso ver_grc");
 console.log("Roles con acceso a gobierno.html:", conGrc.join(", "));
 

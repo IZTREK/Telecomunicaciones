@@ -18,10 +18,17 @@ WORKDIR /var/www
 RUN rm -rf /var/www/*
 
 # --- Esqueleto oficial de Laravel ---
+# policy.advisories.block=false: Laravel 11 ya no recibe parches y Composer
+# se niega a instalarlo si hay avisos de seguridad publicados. Se acepta
+# solo porque es un proyecto académico que corre en local.
+# El .env que deja create-project se borra: el nuestro lo crea entrypoint.sh
+# en cada contenedor, con llaves propias (no quedan horneadas en la imagen).
 RUN composer config --global policy.advisories.block false \
-    && composer create-project laravel/laravel . "^11.0" --prefer-dist --no-interaction --no-progress
+    && composer create-project laravel/laravel . "^11.0" --prefer-dist --no-interaction --no-progress \
+    && rm -f .env
+
 # --- Autenticación por JWT ---
-RUN composer require php-open-source-saver/jwt-auth --no-interaction
+RUN composer require php-open-source-saver/jwt-auth:^2.0 --no-interaction
 
 # --- Nuestro código de aplicación se copia ENCIMA del esqueleto ---
 COPY laravel-app/app/ ./app/
@@ -33,15 +40,14 @@ COPY laravel-app/config/auth.php ./config/auth.php
 COPY laravel-app/bootstrap/app.php ./bootstrap/app.php
 COPY laravel-app/.env.example ./.env.example
 
-# --- Configuración base (.env, APP_KEY, config de JWT y su llave) ---
-RUN cp .env.example .env \
-    && php artisan key:generate --force \
-    && php artisan vendor:publish --provider="PHPOpenSourceSaver\JWTAuth\Providers\LaravelServiceProvider" --force \
-    && php artisan jwt:secret --force
+# --- config/jwt.php del paquete JWT (la llave se genera al arrancar) ---
+RUN php artisan vendor:publish --provider="PHPOpenSourceSaver\JWTAuth\Providers\LaravelServiceProvider" --force
 
 # --- Script de arranque (ver docker/entrypoint.sh) ---
+# El sed quita los saltos de línea de Windows (CRLF) por si el repo se
+# clonó en Windows sin .gitattributes: con CRLF bash no puede ejecutarlo.
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
 
 RUN chown -R www-data:www-data /var/www \
     && chmod -R 775 storage bootstrap/cache

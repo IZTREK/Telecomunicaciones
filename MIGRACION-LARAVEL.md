@@ -1,137 +1,63 @@
-# Migración a Docker + Nginx + Laravel + MySQL
+# Migración: de ASP.NET Core + SQL Server a Docker + Laravel + MySQL
 
-Esta carpeta reemplaza al backend en ASP.NET Core + SQL Server por uno
-equivalente en **Laravel + MySQL**, corriendo dentro de **Docker** con
-**Nginx** como servidor web — tal como pide la propuesta del proyecto.
+Registro de cómo se migró el backend (v2 → v3) para cumplir con la
+arquitectura de la propuesta del proyecto: **Nginx + Laravel + MySQL en
+Docker**. Para correr el proyecto, sigue el [README](README.md).
 
-La lógica es la misma que ya conocen (mismos endpoints, mismos usuarios
-ficticios, mismas reglas de seguridad); solo cambió el lenguaje y dónde
-corre.
-
----
-
-## 1. Qué se instala dónde
-
-```
-perroniphone/
-├── docker-compose.yml
-├── Dockerfile
-├── docker/
-│   ├── entrypoint.sh
-│   └── nginx/default.conf
-├── laravel-app/              <- código que SÍ escribimos nosotros
-│   ├── app/Http/Controllers/Api/   (AuthController, UsuariosController, ...)
-│   ├── app/Http/Middleware/EnsureRole.php
-│   ├── app/Models/            (Usuario, Plan, Bitacora, Permiso)
-│   ├── app/Services/PasswordHasher.php
-│   ├── bootstrap/app.php
-│   ├── config/ (auth.php, cors.php)
-│   ├── database/migrations/   (equivalente a crear-base-datos.sql)
-│   ├── database/seeders/DatabaseSeeder.php  (datos ficticios)
-│   ├── routes/api.php
-│   └── .env.example
-├── assets/js/api.js           <- YA actualizado (apunta a http://localhost:8080/api)
-└── (el resto de tu proyecto: index.html, login.html, etc. — sin cambios)
-```
-
-**Lo que NO está aquí a propósito:** el esqueleto completo de Laravel
-(`vendor/`, `public/index.php`, `artisan`, etc.). Eso se genera solo, la
-primera vez que construyan la imagen de Docker (necesita internet real
-para bajar Laravel de Packagist/GitHub, algo que yo no puedo hacer desde
-aquí). Ustedes solo corren un comando y Docker se encarga.
+La lógica de negocio se conservó (mismos endpoints, mismo algoritmo de
+contraseñas, mismas reglas de bloqueo); cambiaron el lenguaje y la
+infraestructura. Después de la migración se agregaron roles nuevos, el
+módulo de contabilidad y la autorización por permisos (ver más abajo).
 
 ---
 
-## 2. Cómo instalarlo sobre tu proyecto actual
-
-1. Copia las carpetas `docker/` y `laravel-app/`, y los archivos
-   `docker-compose.yml` y `Dockerfile`, a la raíz de tu proyecto
-   (`perroniphone/`), junto a `index.html`.
-2. Reemplaza tu `assets/js/api.js` actual por el que te mando aparte (ya
-   apunta al puerto de Docker/nginx).
-3. El backend de ASP.NET Core (`backend/`) puedes dejarlo ahí sin
-   problema, o moverlo a una carpeta `backend-dotnet-legacy/` si quieren
-   conservar evidencia de la primera versión para su documentación — no
-   estorba, Docker no lo toca.
-
----
-
-## 3. Levantarlo
-
-Desde la terminal, parados en la raíz del proyecto (donde está
-`docker-compose.yml`):
-
-```bash
-docker compose build
-```
-
-Esto tarda varios minutos la primera vez (descarga PHP, Composer, y todo
-Laravel). Cuando termine:
-
-```bash
-docker compose up -d
-```
-
-Con `docker compose logs -f app` puedes ver en vivo qué está haciendo el
-contenedor de Laravel (debe terminar con algo como
-`[entrypoint] Listo. Arrancando PHP-FPM...`).
-
----
-
-## 4. Verificar que quedó funcionando
-
-- **API por nginx:** `http://localhost:8080/api/planes` en el navegador
-  debe devolver un JSON con los 3 planes.
-- **Base de datos (phpMyAdmin):** `http://localhost:8081` — usuario
-  `perroniphone_user`, contraseña `perroniphone_pass` (o `root` /
-  `perroniphone_root_pass` para ver todo). Deben aparecer las tablas
-  `usuarios`, `planes`, `bitacora`, `permisos` ya con datos.
-- **Frontend:** abre `index.html` con Live Server, igual que siempre.
-  Intenta iniciar sesión con `admin@perroniphone.edu.mx` / `Admin#2026`.
-
----
-
-## 5. Comandos útiles del día a día
-
-```bash
-docker compose up -d          # levantar todo (en segundo plano)
-docker compose down           # apagar todo
-docker compose logs -f app    # ver qué hace Laravel en vivo
-docker compose exec app bash  # entrar a una terminal DENTRO del contenedor
-docker compose build app      # reconstruir la imagen si cambiaste el Dockerfile
-```
-
-Si cambian código PHP dentro de `laravel-app/`, necesitan **reconstruir**
-la imagen (`docker compose build app && docker compose up -d`) para que
-el cambio se refleje — a diferencia de `dotnet run`, este contenedor no
-recarga solo con guardar el archivo.
-
----
-
-## 6. Credenciales de prueba (idénticas a las de SQL Server)
-
-| Correo | Contraseña | Rol |
-|---|---|---|
-| admin@perroniphone.edu.mx | Admin#2026 | administrador |
-| soporte@perroniphone.edu.mx | Soporte#2026 | soporte |
-| cliente@perroniphone.edu.mx | Cliente#2026 | cliente |
-| emilio.farias@perroniphone.edu.mx | Cliente#2026 | cliente (bloqueada) |
-
----
-
-## 7. Qué cambió realmente (para su reporte de aportaciones)
+## 1. Equivalencias
 
 | Antes (ASP.NET Core + SQL Server) | Ahora (Laravel + MySQL) |
 |---|---|
 | `Program.cs` (arranque, JWT, CORS) | `bootstrap/app.php` + `config/auth.php` + `config/cors.php` |
 | `AuthController.cs` | `app/Http/Controllers/Api/AuthController.php` |
 | `UsuariosController.cs` | `app/Http/Controllers/Api/UsuariosController.php` |
-| `[Authorize(Roles = "...")]` | Middleware `EnsureRole` en `routes/api.php` |
-| `PasswordHasher.cs` (PBKDF2) | `app/Services/PasswordHasher.php` (mismo algoritmo) |
+| `BitacoraController.cs` | `app/Http/Controllers/Api/BitacoraController.php` |
+| `[Authorize(Roles = "...")]` | Middleware `permiso:<nombre>` (`EnsurePermission`) en `routes/api.php` |
+| `PasswordHasher.cs` (PBKDF2) | `app/Services/PasswordHasher.php` (mismos parámetros) |
 | `TokenService.cs` (JWT) | Paquete `php-open-source-saver/jwt-auth` |
+| `appsettings.json` | `.env` (generado por `docker/entrypoint.sh`) |
 | `crear-base-datos.sql` (SSMS) | `database/migrations/*.php` + `database/seeders/DatabaseSeeder.php` |
-| `dotnet run` | `docker compose up` (Nginx + PHP-FPM + MySQL) |
+| SQL Server Management Studio | phpMyAdmin (http://localhost:8081) |
+| `dotnet run` | `docker compose up -d --build` |
 
-La lógica de negocio (reglas de bloqueo, validaciones, permisos por rol)
-es la misma en los dos — lo que cambió es el lenguaje y la
-infraestructura donde corre.
+## 2. Cómo se arma la imagen
+
+El repositorio solo guarda **nuestro** código (`laravel-app/`). El
+`Dockerfile`:
+
+1. Parte de `php:8.3-fpm` e instala las extensiones que necesita Laravel.
+2. Crea un Laravel 11 limpio con `composer create-project` e instala el
+   paquete de JWT.
+3. Copia encima nuestras carpetas (`app/`, `routes/`, `database/`,
+   `public/`, `bootstrap/app.php`, `config/auth.php`, `config/cors.php`).
+
+Al arrancar, `docker/entrypoint.sh` crea el `.env`, genera `APP_KEY` y
+`JWT_SECRET`, corre las migraciones y el seeder.
+
+## 3. Cambios posteriores a la migración
+
+- **Frontend dentro de `laravel-app/public/`**: nginx lo sirve en el mismo
+  origen que la API (`/api`), así que ya no se usa Live Server y funciona
+  igual detrás de ngrok.
+- **Roles nuevos**: `redes`, `encargado` y `contabilidad`, además de los
+  originales `administrador`, `soporte` y `cliente`.
+- **Autorización por permisos**: la matriz rol → permisos vive en
+  `database/data/permisos.json`; el backend autoriza con ella y el frontend
+  la recibe en el login.
+- **Módulo de contabilidad**: tabla `contabilidad`, endpoint
+  `GET /api/contabilidad` y página `contabilidad.html`.
+
+## 4. Bases de datos de versiones anteriores
+
+Las migraciones y el seeder están hechos para actualizar una base existente
+sin borrarla: la columna `rol` se convierte a texto, se crea la tabla de
+contabilidad si falta y la matriz de permisos se sincroniza en cada arranque.
+Los usuarios existentes **conservan su rol**; para empezar con las cuentas
+del README, borra la base con `docker compose down -v`.

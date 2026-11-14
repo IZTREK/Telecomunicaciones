@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Bitacora;
+use App\Models\Permiso;
 use App\Models\Usuario;
 use App\Services\PasswordHasher;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
@@ -15,64 +18,62 @@ class AuthController extends Controller
     private const MAX_INTENTOS = 5;
     private const MINUTOS_BLOQUEO = 2;
 
+    // Salt/hash de relleno para correos que no existen: así se ejecuta el
+    // mismo PBKDF2 y la respuesta tarda lo mismo exista o no la cuenta
+    // (evita enumerar usuarios midiendo tiempos).
+    private const SALT_FICTICIO = '00000000000000000000000000000000';
+    private const HASH_FICTICIO = '0000000000000000000000000000000000000000000000000000000000000000';
+
     public function __construct(private PasswordHasher $hasher)
     {
     }
 
     public function login(Request $request)
     {
-        $data = $request->validate([
-            'correo' => ['required', 'string'],
-            'password' => ['required', 'string'],
+        $validador = Validator::make($request->all(), [
+            'correo' => ['required', 'string', 'email', 'max:150'],
+            'password' => ['required', 'string', 'max:200'],
         ]);
+        if ($validador->fails()) {
+            return response()->json(['mensaje' => 'Ingresa un correo válido y tu contraseña.'], 422);
+        }
+        $data = $validador->validated();
 
-        // Consulta a través de Eloquent: internamente ya usa "prepared
-        // statements" (parámetros enlazados), igual que Dapper en C#,
-        // así que el correo nunca se concatena directo al SQL.
+        // Eloquent usa consultas parametrizadas: el correo nunca se
+        // concatena al SQL (sin inyección SQL).
         $usuario = Usuario::where('correo', $data['correo'])->first();
 
-        // Mensaje genérico: no revela si el correo existe o no (anti user-enumeration).
-        $credencialesInvalidas = response()->json(['mensaje' => 'Correo o contraseña incorrectos.'], 401);
+        $passwordCorrecto = $this->hasher->verificar(
+            $data['password'],
+            $usuario->salt ?? self::SALT_FICTICIO,
+            $usuario->hash_password ?? self::HASH_FICTICIO,
+        ) && $usuario !== null;
 
-        if (!$usuario) {
-            $this->registrarBitacora('warn', "Intento de acceso con correo no registrado ({$data['correo']})");
-            return $credencialesInvalidas;
-        }
-
-        if ($usuario->estado === 'bloqueado') {
-            return response()->json(['mensaje' => 'Esta cuenta está bloqueada. Contacta a un administrador.'], 401);
-        }
-
-        if ($usuario->bloqueado_hasta && Carbon::parse($usuario->bloqueado_hasta)->isFuture()) {
-            $restante = now()->diffInSeconds($usuario->bloqueado_hasta);
-            return response()->json(['mensaje' => "Demasiados intentos. Intenta de nuevo en {$restante}s."], 429);
-        }
-
-        $passwordCorrecto = $this->hasher->verificar($data['password'], $usuario->salt, $usuario->hash_password);
-
+        // Mismo mensaje y mismo código si el correo no existe, si la
+        // contraseña es incorrecta o si la cuenta está bloqueada: nada de
+        // eso se revela a quien no conoce la contraseña.
         if (!$passwordCorrecto) {
-            $usuario->intentos_fallidos += 1;
-
-            if ($usuario->intentos_fallidos >= self::MAX_INTENTOS) {
-                $usuario->bloqueado_hasta = now()->addMinutes(self::MINUTOS_BLOQUEO);
-                $usuario->save();
-
-                $this->registrarBitacora(
-                    'danger',
-                    self::MAX_INTENTOS . "º intento fallido — cuenta bloqueada temporalmente ({$usuario->codigo_usuario})",
-                    $usuario->id
-                );
-
-                return response()->json([
-                    'mensaje' => 'Demasiados intentos fallidos. Cuenta bloqueada temporalmente por ' . self::MINUTOS_BLOQUEO . ' minutos.',
-                ], 429);
+            if ($usuario) {
+                $this->registrarIntentoFallido($usuario->id);
+            } else {
+                $this->registrarBitacora('warn', "Intento de acceso con correo no registrado ({$data['correo']})");
             }
-
-            $usuario->save();
-            return $credencialesInvalidas;
+            return response()->json(['mensaje' => 'Correo o contraseña incorrectos.'], 401);
         }
 
-        // Login correcto: se reinician los intentos y se registra el acceso.
+        // A partir de aquí quien pide ya demostró conocer la contraseña,
+        // así que sí se le puede explicar por qué no entra.
+        if ($usuario->estado !== 'activo') {
+            return response()->json(['mensaje' => 'Esta cuenta está bloqueada. Contacta a un administrador.'], 403);
+        }
+
+        if ($usuario->bloqueado_hasta?->isFuture()) {
+            $segundos = (int) ceil(now()->diffInSeconds($usuario->bloqueado_hasta, true));
+            return response()->json([
+                'mensaje' => "Cuenta bloqueada temporalmente por intentos fallidos. Intenta de nuevo en {$segundos} s.",
+            ], 429);
+        }
+
         $usuario->intentos_fallidos = 0;
         $usuario->bloqueado_hasta = null;
         $usuario->ultimo_acceso = now();
@@ -86,8 +87,45 @@ class AuthController extends Controller
         return response()->json([
             'token' => $token,
             'expira' => now()->addMinutes($ttlMinutos)->toIso8601String(),
-            'usuario' => $usuario->toPublicArray(),
+            'usuario' => $usuario->toPublicArray() + ['permisos' => Permiso::delRol($usuario->rol)],
         ]);
+    }
+
+    /**
+     * Suma un intento fallido de forma atómica: el registro se bloquea
+     * (SELECT ... FOR UPDATE) mientras se actualiza, así que peticiones
+     * simultáneas no pueden "perder" intentos y saltarse el límite.
+     */
+    private function registrarIntentoFallido(int $usuarioId): void
+    {
+        DB::transaction(function () use ($usuarioId) {
+            $usuario = Usuario::whereKey($usuarioId)->lockForUpdate()->first();
+
+            // Durante un bloqueo vigente los intentos ya no cuentan.
+            if ($usuario->bloqueado_hasta?->isFuture()) {
+                return;
+            }
+
+            // Si hubo un bloqueo que ya venció (o el contador quedó en el
+            // máximo), se empieza de cero en lugar de re-bloquear al primer error.
+            if ($usuario->bloqueado_hasta || $usuario->intentos_fallidos >= self::MAX_INTENTOS) {
+                $usuario->intentos_fallidos = 0;
+                $usuario->bloqueado_hasta = null;
+            }
+
+            $usuario->intentos_fallidos += 1;
+
+            if ($usuario->intentos_fallidos >= self::MAX_INTENTOS) {
+                $usuario->bloqueado_hasta = now()->addMinutes(self::MINUTOS_BLOQUEO);
+                $this->registrarBitacora(
+                    'danger',
+                    self::MAX_INTENTOS . "º intento fallido — cuenta bloqueada temporalmente ({$usuario->codigo_usuario})",
+                    $usuario->id
+                );
+            }
+
+            $usuario->save();
+        });
     }
 
     private function registrarBitacora(string $tipo, string $mensaje, ?int $usuarioId = null): void
@@ -95,7 +133,7 @@ class AuthController extends Controller
         Bitacora::create([
             'fecha' => now(),
             'tipo' => $tipo,
-            'mensaje' => $mensaje,
+            'mensaje' => Str::limit($mensaje, 295),
             'usuario_id' => $usuarioId,
         ]);
     }

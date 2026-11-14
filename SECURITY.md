@@ -1,193 +1,175 @@
 # Documentación de decisiones de seguridad — Portal PerroniPhone
 
-Este documento explica **qué** controles de seguridad se implementaron en el
-portal académico de PerroniPhone, **por qué** se eligieron y **cuáles son sus
-límites** al tratarse de un sitio estático (sin servidor real). El objetivo
-es que la implementación sea evaluable como ejercicio de seguridad
-aplicada, no solo como interfaz visual.
+Este documento explica **qué** controles de seguridad implementa el portal
+académico de PerroniPhone, **por qué** se eligieron y **cuáles son sus
+límites**. La versión navegable está en
+[`laravel-app/public/security.html`](laravel-app/public/security.html)
+(`http://localhost:8080/security.html` con los contenedores arriba).
 
-> **Alcance del proyecto**: ASP.NET Core Web API + SQL Server como backend,
-> consumido por un frontend HTML/CSS/JavaScript. Todos los usuarios, correos
-> y contraseñas son ficticios.
+> **Alcance**: frontend HTML/CSS/JS + API REST en **Laravel 11 (PHP 8.3)** +
+> **MySQL 8**, detrás de **Nginx**, todo en **Docker Compose**. Todos los
+> usuarios, correos y contraseñas son ficticios.
 
-## Actualización: de prototipo estático a backend real
-
-Esta es la segunda versión del proyecto. La primera era 100% del lado del
-cliente (sin servidor); esta versión agrega un backend en ASP.NET Core y
-una base de datos en SQL Server, lo que resuelve varias de las limitaciones
-documentadas originalmente:
-
-- El hashing de contraseñas pasó de SHA-256 simple (en el navegador) a
-  **PBKDF2 con 100,000 iteraciones**, calculado y verificado solo en el
-  servidor (`Services/PasswordHasher.cs`).
-- La sesión pasó de un token sin firmar en `sessionStorage` a un **JWT
-  firmado** por la API (`Services/TokenService.cs`); el cliente ya no puede
-  alterar su propio rol o id.
-- El control de acceso por rol (RBAC) ahora se aplica también en cada
-  endpoint con `[Authorize(Roles = "...")]`, no solo ocultando botones en
-  el HTML.
-- El bloqueo por intentos fallidos vive en la tabla `Usuarios` de SQL
-  Server (columnas `IntentosFallidos`, `BloqueadoHasta`), no en el
-  navegador — persiste entre sesiones y no se puede evadir abriendo una
-  pestaña nueva.
-- Todas las consultas a la base de datos usan parámetros vía Dapper
-  (`@Correo`, `@Id`, etc.), nunca concatenación de strings, lo que previene
-  **inyección SQL**.
-
-Las secciones siguientes se conservan tal como se documentaron en la
-primera versión (para mostrar el razonamiento original) y se marcan cuando
-el "límite conocido" ya fue resuelto por el backend actual.
+> **Historia**: la v1 era 100% del lado del cliente; la v2 agregó un backend
+> en ASP.NET Core + SQL Server; la versión actual (v3) migró a
+> Laravel + MySQL. Las referencias a la v1/v2 quedan en el historial de Git.
 
 ---
 
 ## 1. Autenticación
 
 ### 1.1 Contraseñas nunca en texto plano
-- **Decisión**: cada usuario en `assets/js/db.js` almacena un `salt`
-  aleatorio y un `hash` SHA-256 de `salt + contraseña`, calculado con
-  antelación. El formulario de login (`login.html`) nunca compara la
-  contraseña escrita contra un valor en texto plano: usa
-  `crypto.subtle.digest("SHA-256", ...)` en `assets/js/auth.js` y compara
-  hashes.
-- **Por qué**: aun en una demo, se busca modelar la práctica real de no
-  guardar ni transmitir contraseñas legibles.
-- **Límite conocido**: SHA-256 puro es rápido de fuerza-bruta comparado con
-  funciones diseñadas para contraseñas. En producción se usaría **bcrypt,
-  scrypt o Argon2** en el servidor, con el cómputo del hash ocurriendo del
-  lado servidor, nunca en el cliente (aquí ocurre en el cliente porque no
-  existe servidor).
+- **Decisión**: cada fila de `usuarios` guarda un `salt` aleatorio de 16
+  bytes y un `hash_password` derivado con **PBKDF2-HMAC-SHA256, 100,000
+  iteraciones** (`app/Services/PasswordHasher.php`). La comparación usa
+  `hash_equals()` (tiempo constante, evita *timing attacks*).
+- **Por qué**: PBKDF2 es lento a propósito, lo que encarece la fuerza bruta
+  y los diccionarios si alguien obtuviera la base.
+- **Límite**: hoy se prefiere **Argon2id** o **bcrypt** (`Hash::make()` de
+  Laravel). Se conservó PBKDF2 por continuidad con la v2.
 
-### 1.2 Mensajes de error genéricos
-- **Decisión**: si el correo no existe o la contraseña es incorrecta, se
-  muestra el mismo mensaje ("Correo o contraseña incorrectos").
-- **Por qué**: evita que un atacante pueda enumerar qué correos están
-  registrados en el sistema (*user enumeration*).
+### 1.2 Sin enumeración de usuarios
+- **Decisión** (`AuthController::login`): si el correo no existe, la
+  contraseña es incorrecta **o la cuenta está bloqueada**, la respuesta es
+  siempre `401 "Correo o contraseña incorrectos."`. El motivo real
+  (cuenta bloqueada, bloqueo temporal) solo se explica cuando la contraseña
+  es correcta.
+- **Tiempo constante**: para correos inexistentes se calcula igualmente un
+  PBKDF2 contra un salt/hash de relleno, así la respuesta tarda lo mismo
+  exista o no la cuenta.
+- **Por qué**: un atacante no puede averiguar qué correos están registrados
+  ni por el mensaje, ni por el código HTTP, ni midiendo el tiempo.
 
-### 1.3 Bloqueo por intentos fallidos (mitigación de fuerza bruta)
-- **Decisión**: tras 5 intentos fallidos sobre el mismo correo, la cuenta
-  se bloquea temporalmente 2 minutos (`registrarIntentoFallido` en
-  `auth.js`). Además, el directorio de usuarios incluye una cuenta ya
-  bloqueada de forma permanente (`emilio.farias@perroniphone.edu.mx`) para
-  demostrar el estado "bloqueado" administrado manualmente.
-- **Límite conocido**: el conteo vive en `sessionStorage` del navegador,
-  por lo que un atacante podría evadirlo abriendo una pestaña nueva. En
-  producción, el conteo debe llevarse en el servidor, idealmente por
-  combinación de cuenta + dirección IP, con *rate limiting* a nivel de
-  infraestructura (por ejemplo, un WAF o middleware dedicado).
+### 1.3 Bloqueo por intentos fallidos (por cuenta)
+- **Decisión**: al 5º intento fallido la cuenta se bloquea **2 minutos**
+  (`bloqueado_hasta`). Durante el bloqueo los intentos no cuentan; al
+  vencer, el contador vuelve a cero.
+- **Atomicidad**: el incremento se hace dentro de una transacción con
+  `SELECT … FOR UPDATE`, así que peticiones simultáneas no pueden "perder"
+  intentos y saltarse el límite.
 
----
-
-## 2. Gestión de sesión
-
-- **Decisión**: al autenticarse, se genera un objeto de sesión
-  (`id`, `rol`, `correo`, tiempos de emisión/expiración) codificado en
-  Base64 y guardado en `sessionStorage`, con expiración de 20 minutos.
-  Cada página protegida llama a `requerirSesion()` para validar que exista
-  una sesión vigente antes de mostrar contenido.
-- **Por qué `sessionStorage` y no `localStorage`**: `sessionStorage` se
-  destruye al cerrar la pestaña/navegador, reduciendo la ventana de
-  exposición frente a `localStorage`, que persiste indefinidamente.
-- **Límite conocido**: este token **no está firmado criptográficamente**;
-  cualquier persona con acceso a las herramientas de desarrollador del
-  navegador podría editarlo. Esto es aceptable únicamente porque no hay
-  datos reales ni un backend que confíe en ese token para operaciones
-  sensibles. En producción, la sesión debe representarse con una
-  **cookie `httpOnly`, `Secure` y `SameSite=Strict`**, o un JWT firmado
-  por el servidor y validado en cada petición, nunca confiando en un
-  valor que el propio cliente puede modificar.
+### 1.4 Límite de peticiones (por IP)
+- **Decisión**: `POST /api/auth/login` acepta **20 peticiones por minuto por
+  IP** (`RateLimiter::for('login')` en `app/Providers/AppServiceProvider.php`).
+- **Por qué**: el bloqueo por cuenta no frena a quien prueba muchas cuentas
+  distintas; éste sí. También limita el costo de CPU de PBKDF2.
+- **IP real**: Laravel solo confía en `X-Forwarded-For` cuando la petición
+  viene de una red privada (nginx en Docker o el agente de ngrok), ver
+  `trustProxies` en `bootstrap/app.php`. Nadie puede falsificar su IP
+  mandando ese header desde internet.
 
 ---
 
-## 3. Control de acceso basado en roles (RBAC)
+## 2. Gestión de sesión (JWT)
 
-- **Decisión**: existen tres roles — `administrador`, `soporte` y
-  `cliente` — cada uno con una lista explícita de permisos en
-  `PERRONI_DB.permisos`. `dashboard.html` oculta secciones (por ejemplo,
-  la bitácora de seguridad) si el rol no tiene el permiso correspondiente,
-  y `admin.html` llama a `requerirSesion(["administrador"])`, redirigiendo
-  a cualquier otro rol.
-- **Por qué**: el principio de **mínimo privilegio** — cada rol ve y hace
-  solo lo necesario para su función.
-- **Límite conocido**: al ser validación en el cliente, es "seguridad de
-  interfaz", no una barrera real: alguien podría abrir `admin.html`
-  directamente y, aunque será redirigido por el script, un backend real
-  debe **revalidar el permiso en cada endpoint del servidor**, no confiar
-  en que el frontend oculte los botones.
-
----
-
-## 4. Protección contra XSS (Cross-Site Scripting)
-
-- **Decisión**: toda información dinámica que proviene de la
-  "base de datos" (nombres, correos, roles) se inserta en el DOM a través
-  de la función `escapeHTML()`, que convierte caracteres como `<`, `>` y
-  `"` en sus entidades HTML antes de escribirlos.
-- **Por qué**: aunque los datos son ficticios y fijos, se modela la
-  disciplina de **nunca insertar texto no controlado directamente en el
-  HTML**, que es la causa más común de XSS en aplicaciones reales.
+- **Decisión**: al iniciar sesión la API emite un **JWT firmado** (HS256,
+  paquete `php-open-source-saver/jwt-auth`) con vigencia de **20 minutos**
+  (`JWT_TTL`). El navegador lo guarda en `sessionStorage` y lo manda en
+  `Authorization: Bearer …`.
+- **Llaves**: `APP_KEY` y `JWT_SECRET` **no están en el repositorio ni en la
+  imagen de Docker**: `docker/entrypoint.sh` las genera al crear cada
+  contenedor. Si el contenedor se recrea, los tokens anteriores dejan de ser
+  válidos y el frontend manda al login automáticamente.
+- **Cuenta bloqueada = sesión terminada**: el middleware `cuenta.activa`
+  (`EnsureCuentaActiva`) revisa el estado en la base en cada petición; si
+  un administrador bloquea una cuenta, su token deja de servir de inmediato
+  aunque no haya expirado.
+- **Por qué `sessionStorage`**: se borra al cerrar la pestaña, a diferencia
+  de `localStorage`.
+- **Límites**: no hay lista de revocación (cerrar sesión borra el token del
+  navegador, pero el token sigue siendo válido hasta expirar) y un XSS
+  podría leer `sessionStorage`. En producción convendría una cookie
+  `httpOnly; Secure; SameSite=Strict` y *refresh tokens*.
 
 ---
 
-## 5. Protección conceptual contra CSRF
+## 3. Control de acceso (RBAC por permisos)
 
-- **Decisión**: el formulario de login incluye un campo oculto
-  `csrf_token`, generado con `crypto.randomUUID()` y almacenado en
-  `sessionStorage`. Al enviar el formulario, `auth.js` valida que el token
-  del formulario coincida con el guardado, y genera uno nuevo tras cada
-  intento.
-- **Por qué**: se busca representar el patrón de un token anti-CSRF por
-  formulario, aunque en este proyecto no exista un servidor que reciba
-  peticiones de estado (no hay operación que un atacante externo pudiera
-  forjar).
-- **Límite conocido**: un token CSRF solo tiene sentido de protección real
-  cuando lo **emite y valida el servidor** en cada envío de formulario que
-  modifique estado. Aquí es un ejercicio didáctico del patrón, no una
-  protección efectiva por sí sola.
+- **Una sola fuente de verdad**:
+  [`laravel-app/database/data/permisos.json`](laravel-app/database/data/permisos.json)
+  define qué permisos tiene cada rol. El seeder la sincroniza con la tabla
+  `permisos` en cada arranque.
+- **Backend (la barrera real)**: cada ruta exige un permiso con el
+  middleware `permiso:<nombre>` (`EnsurePermission`), que consulta la tabla
+  con el **rol actual de la base** (no el del token): un cambio de rol
+  aplica en la siguiente petición.
 
----
+  | Endpoint | Permiso |
+  |---|---|
+  | `GET /api/usuarios`, `GET /api/permisos`, `PUT /api/usuarios/{id}/estado` | `gestionar_usuarios` |
+  | `PUT /api/usuarios/{id}/rol` | `editar_roles` |
+  | `GET /api/bitacora` | `ver_bitacora` |
+  | `GET /api/contabilidad` | `ver_contabilidad` |
 
-## 6. Validación de entradas
-
-- **Decisión**: el correo se valida con una expresión regular antes de
-  intentar autenticar (`validarFormatoCorreo`), y la contraseña recibe
-  retroalimentación de fuerza en tiempo real (`fuerzaPassword`) sin
-  bloquear el envío, para no filtrar la política exacta de contraseñas a
-  un posible atacante.
-- **Por qué**: reduce solicitudes malformadas y ayuda a que las cuentas de
-  demostración usen contraseñas razonablemente robustas.
-
----
-
-## 7. Bitácora de seguridad (auditoría)
-
-- **Decisión**: `PERRONI_DB.bitacora` simula un registro de eventos
-  (accesos correctos, intentos fallidos, bloqueos, cambios de rol),
-  visible solo para los roles `soporte` y `administrador` dentro del
-  dashboard.
-- **Por qué**: la trazabilidad es un control de seguridad en sí mismo —
-  permite detectar y explicar incidentes después de que ocurren.
-- **Límite conocido**: es un arreglo estático de ejemplo; en producción
-  cada evento (login, cambio de rol, bloqueo) debe escribirse en un
-  registro de auditoría del lado del servidor, con marca de tiempo,
-  dirección IP y usuario responsable, protegido contra modificación.
+- **Reglas sobre quién modifica a quién** (`UsuariosController`): nadie puede
+  cambiar su propio rol ni bloquearse a sí mismo, y solo un administrador
+  puede modificar a otro administrador. Juntas garantizan que **siempre
+  quede al menos un administrador activo**.
+- **Frontend (solo UI)**: el login devuelve la lista de permisos del
+  usuario; las páginas la usan para ocultar enlaces y redirigir
+  (`PERRONI_AUTH.requerirSesion("ver_grc")`), pero nunca es la barrera.
+- **Límite**: el contenido de `gobierno.html` (matrices GRC) vive en
+  `assets/js/grc.js`, un archivo público; la restricción de esa página es
+  de interfaz. Es aceptable porque el análisis GRC también es público en
+  `docs/`.
 
 ---
 
-## 8. Resumen de límites generales de esta implementación
+## 4. Inyección SQL
+- **Decisión**: todas las consultas usan Eloquent / Query Builder, que
+  envían parámetros enlazados (*prepared statements*). Nunca se concatena
+  texto del usuario en SQL.
 
-Por ser un proyecto **100% del lado del cliente**, ningún control aquí
-sustituye una implementación real de backend. La tabla resume el
-paralelismo entre lo simulado y lo que correspondería en producción:
+## 5. XSS (Cross-Site Scripting)
+- **Decisión**: todo dato dinámico se inserta en el DOM a través de
+  `PERRONI_AUTH.escapeHTML()`, que convierte `& < > " '` en entidades HTML.
 
-| Control simulado en el portal        | Equivalente recomendado en producción              |
-|---------------------------------------|------------------------------------------------------|
-| Hash SHA-256 + salt en el navegador   | bcrypt/Argon2 calculado y verificado en el servidor  |
-| Token de sesión en `sessionStorage`   | Cookie `httpOnly` + `Secure` + `SameSite`, o JWT firmado |
-| Bloqueo por intentos en el cliente    | *Rate limiting* por cuenta + IP en el servidor/WAF   |
-| RBAC que oculta botones en el DOM     | Autorización revalidada en cada endpoint del backend |
-| Token CSRF simulado                   | Token CSRF emitido y validado por el servidor        |
-| Bitácora estática de ejemplo          | Registro de auditoría persistente y protegido        |
+## 6. CSRF
+- **Decisión**: la API no usa cookies de sesión; la credencial viaja en el
+  header `Authorization`, que un sitio externo no puede hacer que el
+  navegador envíe solo. Por eso no se necesita token anti-CSRF.
+- **CORS**: frontend y API comparten origen (`http://localhost:8080` o el
+  túnel de ngrok), así que `config/cors.php` no permite ningún origen
+  externo por defecto (`FRONTEND_ORIGINS` vacío).
 
-Este enfoque permite demostrar el **razonamiento y las decisiones de
-diseño de seguridad** propias de un portal corporativo, dentro de las
-restricciones de un proyecto académico sin infraestructura de servidor.
+## 7. Validación de entradas
+- **Servidor**: el login exige `correo` con formato de email y máximo 150
+  caracteres, y `password` de máximo 200. Roles y estados se validan contra
+  listas blancas (los roles válidos son los de la matriz de permisos). Los
+  IDs de las rutas solo aceptan números (`whereNumber('id')`).
+- **Cliente**: el correo se valida con una expresión regular antes de
+  enviarlo y se muestra la fuerza estimada de la contraseña (solo
+  informativo).
+
+## 8. Bitácora de seguridad (auditoría)
+- **Decisión**: la tabla `bitacora` registra accesos correctos, intentos
+  con correos inexistentes, bloqueos automáticos, cambios de rol y
+  bloqueos/desbloqueos manuales con el código del responsable. Visible solo
+  con el permiso `ver_bitacora`. Los mensajes se truncan a la longitud de la
+  columna para que un dato largo nunca rompa el registro.
+- **Límite**: no se guarda la IP de origen y los registros no son
+  inmutables (un DBA podría editarlos).
+
+## 9. Infraestructura (Docker)
+- `.env` **no se versiona** (`.gitignore`); cada contenedor crea el suyo
+  desde `.env.example` con llaves nuevas.
+- `APP_DEBUG=false`: un error 500 responde un mensaje genérico, sin stack
+  trace ni rutas internas.
+- MySQL (`3307`) y phpMyAdmin (`8081`) solo escuchan en `127.0.0.1`: no son
+  accesibles desde la red ni a través de ngrok. Solo se publica nginx
+  (`8080`).
+- Nginx bloquea archivos ocultos (`.env`, `.git`, …).
+
+---
+
+## 10. Resumen de límites conocidos
+
+| Control actual | Mejora recomendada en producción |
+|---|---|
+| PBKDF2 (100k iteraciones) | Argon2id / bcrypt con `Hash::make()` |
+| JWT en `sessionStorage`, sin revocación | Cookie `httpOnly` + `Secure` + `SameSite`, *refresh tokens* y lista de revocación |
+| Rate limit por IP en la aplicación | Además, WAF / rate limit en el borde |
+| Bitácora sin IP y editable | Registro inmutable con IP, enviado a un SIEM |
+| Contraseñas de demo publicadas en el README | Alta de usuarios con contraseña temporal y cambio obligatorio |
+| Laravel 11 sin soporte de seguridad | Actualizar a una versión con soporte vigente |
+| HTTP en local | HTTPS obligatorio (ngrok ya lo da en el túnel público) |
