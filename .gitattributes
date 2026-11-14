@@ -2,3 +2,6 @@
 # clone en Windows; con CRLF el contenedor no puede ejecutarlos.
 *.sh text eol=lf
 docker/** text eol=lf
+# El .env.example se copia tal cual al contenedor: con CRLF el entrypoint
+# cree que JWT_SECRET ya tiene valor (el "\r") y nunca lo genera.
+.env.example text eol=lf

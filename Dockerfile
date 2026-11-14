@@ -45,9 +45,10 @@ RUN php artisan vendor:publish --provider="PHPOpenSourceSaver\JWTAuth\Providers\
 
 # --- Script de arranque (ver docker/entrypoint.sh) ---
 # El sed quita los saltos de línea de Windows (CRLF) por si el repo se
-# clonó en Windows sin .gitattributes: con CRLF bash no puede ejecutarlo.
+# clonó en Windows sin .gitattributes: con CRLF bash no puede ejecutar el
+# script, y en .env.example el "\r" hace que JWT_SECRET parezca tener valor.
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh .env.example && chmod +x /usr/local/bin/entrypoint.sh
 
 RUN chown -R www-data:www-data /var/www \
     && chmod -R 775 storage bootstrap/cache
