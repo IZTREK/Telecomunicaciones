@@ -11,6 +11,8 @@ if [ ! -f .env ]; then
     echo "[entrypoint] Creando .env a partir de .env.example"
     cp .env.example .env
 fi
+# Quita CRLF por si el .env vino de un clon en Windows (ver .gitattributes).
+sed -i 's/\r$//' .env
 
 # --- 2) Variables de conexión a MySQL (vienen del docker-compose.yml) ---
 # PHP-FPM no pasa las variables del contenedor a PHP, por eso se escriben
